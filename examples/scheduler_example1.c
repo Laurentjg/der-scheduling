@@ -37,6 +37,7 @@ main(int argc, char** argv)
             printf("ERROR: Cannot start server\n");
         }
 
+        Scheduler_destroy(sched);
         IedServer_destroy(server);
         IedModel_destroy(model);
     }
