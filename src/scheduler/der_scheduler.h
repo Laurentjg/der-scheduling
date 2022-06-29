@@ -10,4 +10,7 @@ Scheduler
 Scheduler_create(IedModel* model, IedServer server);
 
 void
+Scheduler_destroy(Scheduler self);
+
+void
 Scheduler_parseModel(Scheduler self);
