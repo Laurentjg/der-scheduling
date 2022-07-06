@@ -21,11 +21,25 @@ typedef enum {
     SCHD_ENA_ERR_OTHER = 99
 } ScheduleEnablingError;
 
+typedef enum {
+    SCHD_TYPE_UNKNOWN = 0,
+    SCHD_TYPE_INS = 1,
+    SCHD_TYPE_SPS = 2,
+    SCHD_TYPE_ENS = 3,
+    SCHD_TYPE_MV = 4
+} ScheduleTargetType;
+
 struct sSchedule {
     LogicalNode* scheduleLn;
+    ScheduleTargetType targetType;
+
     DataObject* enaReq;
     DataObject* dsaReq;
     DataObject* schdSt;
+    DataObject* val;
+
+    DataObject* evTrg;
+
     IedServer server;
 };
 
@@ -83,44 +97,110 @@ schedule_getState(Schedule self)
 }
 
 static void
+schedule_setState(Schedule self, ScheduleState newState)
+{
+    DataAttribute* schdSt_stVal = (DataAttribute*)ModelNode_getChild((ModelNode*)self->schdSt, "stVal");
+    DataAttribute* schdSt_q = (DataAttribute*)ModelNode_getChild((ModelNode*)self->schdSt, "q");
+    DataAttribute* schdSt_t = (DataAttribute*)ModelNode_getChild((ModelNode*)self->schdSt, "t");
+
+    IedServer_lockDataModel(self->server);
+
+    if (schdSt_t) {
+        Timestamp ts;
+        Timestamp_clearFlags(&ts);
+        Timestamp_setSubsecondPrecision(&ts, 10);
+        Timestamp_setTimeInMilliseconds(&ts, Hal_getTimeInMs());
+        IedServer_updateTimestampAttributeValue(self->server, schdSt_t, &ts);
+    }
+
+    if (schdSt_q) {
+        Quality q = 0;
+        Quality_setValidity(&q, QUALITY_VALIDITY_GOOD);
+        IedServer_updateQuality(self->server, schdSt_q, q);            
+    }
+
+    if (schdSt_stVal) {
+        IedServer_updateInt32AttributeValue(self->server, schdSt_stVal, newState);
+    }
+
+    IedServer_unlockDataModel(self->server);
+}
+
+static void
 schedule_udpateState(Schedule self, ScheduleState newState)
 {
     ScheduleState currentState = schedule_getState(self);
 
     if (currentState != newState) {
-        DataAttribute* schdSt_stVal = (DataAttribute*)ModelNode_getChild((ModelNode*)self->schdSt, "stVal");
-        DataAttribute* schdSt_q = (DataAttribute*)ModelNode_getChild((ModelNode*)self->schdSt, "q");
-        DataAttribute* schdSt_t = (DataAttribute*)ModelNode_getChild((ModelNode*)self->schdSt, "t");
-
-        IedServer_lockDataModel(self->server);
-
-        if (schdSt_t) {
-            Timestamp ts;
-            Timestamp_clearFlags(&ts);
-            Timestamp_setSubsecondPrecision(&ts, 10);
-            Timestamp_setTimeInMilliseconds(&ts, Hal_getTimeInMs());
-            IedServer_updateTimestampAttributeValue(self->server, schdSt_t, &ts);
-        }
-
-        if (schdSt_q) {
-            Quality q = 0;
-            Quality_setValidity(&q, QUALITY_VALIDITY_GOOD);
-            IedServer_updateQuality(self->server, schdSt_q, q);            
-        }
-
-        if (schdSt_stVal) {
-            IedServer_updateInt32AttributeValue(self->server, schdSt_stVal, newState);
-        }
-
-        IedServer_unlockDataModel(self->server);
+        schedule_setState(self, newState);
     }
 }
 
 static MmsDataAccessError
 schdPrio_writeAccessHandler(DataAttribute* dataAttribute, MmsValue* value, ClientConnection connection, void* parameter)
 {
+    Schedule self = (Schedule)parameter;
+
     /* TODO send PRIO_UPDATED event to schedule controller(s) */
     printf("SchPrio.setVal: %i\n", MmsValue_toInt32(value));
+
+    return DATA_ACCESS_ERROR_SUCCESS;
+}
+
+static bool
+isEventDriven(Schedule self)
+{
+    bool eventDriven = false;
+
+    if (self->evTrg) {
+        DataAttribute* setVal = (DataAttribute*)ModelNode_getChild((ModelNode*)self->evTrg, "setVal");
+
+        if (setVal) {
+            if (setVal->mmsValue) {
+                eventDriven = MmsValue_getBoolean(setVal->mmsValue);
+            }
+        }
+    }
+
+    return eventDriven;
+}
+
+static bool 
+checkSyncInput(Schedule self)
+{
+    bool checkResult = false;
+
+    DataAttribute* inSyn_setSrcRef = (DataAttribute*)ModelNode_getChild((ModelNode*)self->scheduleLn, "InSyn.setSrcRef");
+
+    if (inSyn_setSrcRef) {
+        printf("INFO: InSyn set to (%s)\n", MmsValue_toString(inSyn_setSrcRef->mmsValue));
+
+        checkResult = true;
+    }
+
+    return checkResult;
+}
+
+static bool
+enabledSchedule(Schedule self)
+{
+    /* TODO check for conditions to enable schedule */
+
+    //TODO check if a Start time (StrTm) is defined or an external trigger option is set (EvTeg == true}
+    if (isEventDriven(self)) {
+        if (checkSyncInput(self)) {
+            printf("INFO: valid trigger info set\n");
+        }
+    }
+    else {
+
+    }
+}
+
+static void
+disableSchedule(Schedule self)
+{
+
 }
 
 static ControlHandlerResult 
@@ -132,13 +212,23 @@ schedule_controlHandler(ControlAction action, void* parameter, MmsValue* ctlVal,
 
     if (ctrlObj == self->enaReq) {
         if ((test == false) && (MmsValue_getBoolean(ctlVal) == true)) {
-            /* TODO check for conditions to enable schedule */
 
-            printf("Enabled schedule\n");
+            if (enabledSchedule(self)) {
+                printf("Enabled schedule\n");
+            }
+            else {
+                //TODO figure out how a negative answer can be sent?
+                printf("Cannot enable schedule\n");
+            }
+
+
         }
     }
     else if (ctrlObj == self->dsaReq) {
         if ((test == false) && (MmsValue_getBoolean(ctlVal) == true)) {
+
+            disableSchedule(self);
+
             printf("Disabled schedule\n");
         }
     }
@@ -151,6 +241,8 @@ Schedule_create(LogicalNode* schedLn, IedServer server)
 
     /* check for other indications DO "ActSchdRef", DO "CtlEnt", DO "ValXX", DO "SchdXX" */
     bool isSchedule = true;
+
+    ScheduleTargetType targetType = SCHD_TYPE_UNKNOWN;
 
     DataAttribute* schdPrio_setVal = NULL;
 
@@ -198,8 +290,36 @@ Schedule_create(LogicalNode* schedLn, IedServer server)
         isSchedule = false;
     }
 
+    ModelNode* scheduleValue = ModelNode_getChild((ModelNode*)schedLn, "ValMV");
+
+    if (scheduleValue) {
+        targetType = SCHD_TYPE_MV;
+    }
+
+    scheduleValue = ModelNode_getChild((ModelNode*)schedLn, "ValINS");
+
+    if (scheduleValue) {
+        targetType = SCHD_TYPE_INS;
+    }
+
+    scheduleValue = ModelNode_getChild((ModelNode*)schedLn, "ValSPS");
+
+    if (scheduleValue) {
+        targetType = SCHD_TYPE_SPS;
+    }
+
+    scheduleValue = ModelNode_getChild((ModelNode*)schedLn, "ValENS");
+
+    if (scheduleValue) {
+        targetType = SCHD_TYPE_ENS;
+    }
+
+    if (targetType == SCHD_TYPE_UNKNOWN) {
+        printf("ERROR: Found schedule %s/%s but with unknown target type!\n", schedLn->parent->name, schedLn->name);
+    }
+
     if (isSchedule) {
-        printf("Found schedule: %s/%s\n", schedLn->parent->name, schedLn->name);
+        printf("INFO: Found schedule: %s/%s\n", schedLn->parent->name, schedLn->name);
     }
 
     if (isSchedule) {
@@ -212,13 +332,26 @@ Schedule_create(LogicalNode* schedLn, IedServer server)
             self->enaReq = (DataObject*)enaReq;
             self->dsaReq = (DataObject*)dsaReq;
             self->schdSt = (DataObject*)schdSt;
+            self->val = (DataObject*)scheduleValue;
+
+            self->evTrg = (DataObject*)ModelNode_getChild((ModelNode*)schedLn, "EvTrg");
+
+            if (self->evTrg) {
+                DataAttribute* inSyn_setSrcRef = (DataAttribute*)ModelNode_getChild((ModelNode*)schedLn, "InSyn.setSrcRef");
+
+                if (inSyn_setSrcRef == NULL) {
+                    printf("ERROR: Found EvTrg but InSyn.setSrcRef not present\n");
+                }
+            }
+
+            self->targetType = targetType;
 
             IedServer_handleWriteAccess(self->server, schdPrio_setVal, schdPrio_writeAccessHandler, self);
 
             IedServer_setControlHandler(self->server, self->dsaReq, schedule_controlHandler, self);
             IedServer_setControlHandler(self->server, self->enaReq, schedule_controlHandler, self);
 
-            schedule_udpateState(self, SCHD_STATE_NOT_READY);
+            schedule_setState(self, SCHD_STATE_NOT_READY);
         }
     }
 
