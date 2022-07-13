@@ -1,7 +1,10 @@
 #include "der_scheduler.h"
 
+#include <libiec61850/hal_thread.h>
+
 #include <string.h>
 #include <stdio.h>
+#include <ctype.h>
 
 typedef enum {
     SCHD_STATE_INVALID = 0,
@@ -40,7 +43,13 @@ struct sSchedule {
 
     DataObject* evTrg;
 
+    uint64_t nextStartTime;
+
     IedServer server;
+    IedModel* model;
+
+    Thread thread;
+    bool alive;
 };
 
 struct sScheduleController {
@@ -71,6 +80,41 @@ ScheduleController_create(LogicalNode* fsccLn, IedServer server)
     }
 
     return self;
+}
+
+static bool checkIfMultiObjInst(const char* name, const char* multiName)
+{
+    bool isInstance = false;
+
+    int multiNameSize = strlen(multiName);
+    int nameSize = strlen(name);
+
+    if (nameSize >= multiNameSize) {
+
+        if (memcmp(name, multiName, multiNameSize) == 0) {
+            bool isNumber = true;
+
+            int i;
+
+            for (i = multiNameSize; i < nameSize; i++) {
+                if (isdigit(name[i]) == false) {
+                    isNumber = false;
+                    break;
+                }
+            }
+
+            if (isNumber) {
+                isInstance = true;
+            }
+        }
+    }
+
+    return isInstance;
+}
+
+static bool checkIfStrTm(const char* name)
+{
+    return checkIfMultiObjInst(name, "StrTm");
 }
 
 static ScheduleState
@@ -136,6 +180,151 @@ schedule_udpateState(Schedule self, ScheduleState newState)
     }
 }
 
+static void updateIntStatusValue(IedServer server, DataObject* dobj, int32_t value, uint64_t timestamp)
+{
+    DataAttribute* stVal = (DataAttribute*)ModelNode_getChild((ModelNode*)dobj, "stVal");
+
+    if (stVal) {
+        if (stVal->mmsValue) {
+            if (MmsValue_getType(stVal->mmsValue) == MMS_INTEGER) {
+
+                DataAttribute* t = (DataAttribute*)ModelNode_getChild((ModelNode*)dobj, "t");
+
+                IedServer_lockDataModel(server);
+
+                if (t) {
+                    IedServer_updateUTCTimeAttributeValue(server, t, timestamp);
+                }
+
+                IedServer_updateInt32AttributeValue(server, stVal, value);
+
+                IedServer_unlockDataModel(server);
+            }
+        }
+    }
+}
+
+static void
+schedule_updateScheduleEnableError(Schedule self, ScheduleEnablingError err)
+{
+    DataObject* schdEnaErr = (DataObject*)ModelNode_getChild((ModelNode*)self->scheduleLn, "SchdEnaErr");
+
+    if (schdEnaErr) {
+        updateIntStatusValue(self->server, schdEnaErr, (int32_t)err, Hal_getTimeInMs());
+    }
+}
+
+static void
+schedule_updateNxtStrTm(Schedule self, uint64_t nextStartTime)
+{
+    DataObject* nxtStrTm = (DataObject*)ModelNode_getChild((ModelNode*)self->scheduleLn, "NxtStrTm");
+
+    if (nxtStrTm) {
+
+        DataAttribute* stVal = (DataAttribute*)ModelNode_getChild((ModelNode*)nxtStrTm, "stVal");
+        DataAttribute* q = (DataAttribute*)ModelNode_getChild((ModelNode*)nxtStrTm, "q");
+        DataAttribute* t = (DataAttribute*)ModelNode_getChild((ModelNode*)nxtStrTm, "t");
+
+        if (stVal && q && t) {
+            Timestamp ts;
+            Timestamp_clearFlags(&ts);
+            Timestamp_setTimeInMilliseconds(&ts, nextStartTime);
+
+            IedServer_lockDataModel(self->server);
+
+            IedServer_updateTimestampAttributeValue(self->server, stVal, &ts);
+
+            if (nextStartTime != 0)
+                IedServer_updateQuality(self->server, q, (Quality)QUALITY_VALIDITY_GOOD);
+            else
+                IedServer_updateQuality(self->server, q, (Quality)QUALITY_VALIDITY_INVALID);
+
+            Timestamp_setTimeInMilliseconds(&ts, Hal_getTimeInMs());
+
+            IedServer_updateTimestampAttributeValue(self->server, t, &ts);
+
+            IedServer_unlockDataModel(self->server);
+        }
+    }
+}
+
+static uint64_t
+schedule_getNextStartTime(Schedule self)
+{
+    uint64_t nextStartTime = 0;
+
+    uint64_t currentTime = Hal_getTimeInMs();
+
+    LinkedList dataObjects = ModelNode_getChildren((ModelNode*)self->scheduleLn);
+
+    LinkedList doElem = LinkedList_getNext(dataObjects);
+
+    while (doElem) {
+        DataObject* dObj = (DataObject*)LinkedList_getData(doElem);
+
+        // check that data object name is "StrTmXXX"
+        if (checkIfStrTm(dObj->name)) {
+
+            DataAttribute* setTm = (DataAttribute*)ModelNode_getChild((ModelNode*)dObj, "setTm");
+
+            if (setTm->mmsValue) {
+                uint64_t strTmVal = MmsValue_getUtcTimeInMs(setTm->mmsValue);
+
+                if (strTmVal > currentTime) {
+
+                    if (nextStartTime == 0) {
+                        nextStartTime = strTmVal;
+                    }
+                    else {
+                        if (strTmVal <= nextStartTime) {
+                            nextStartTime = strTmVal;
+                        }
+                    }
+                }
+            }
+        }
+
+        doElem = LinkedList_getNext(doElem);
+    }
+
+    LinkedList_destroyStatic(dataObjects);
+
+    return nextStartTime;
+}
+
+static MmsDataAccessError
+strTm_writeAccessHandler(DataAttribute* dataAttribute, MmsValue* value, ClientConnection connection, void* parameter)
+{
+    Schedule self = (Schedule)parameter;
+
+    uint64_t newStrTm = MmsValue_getUtcTimeInMs(value);
+
+    char objRefBuf[130];
+
+    ModelNode_getObjectReference((ModelNode*) dataAttribute, objRefBuf);
+
+    // check if the time is valid (is in the future)
+    if (newStrTm > Hal_getTimeInMs()) {
+        //TODO check if the schedule is in the correct state?
+
+        if (schedule_getState(self) == SCHD_STATE_READY) {
+            //self->nextStartTime = schedule_getNextStartTime(self);
+
+            //schedule_updateNxtStrTm(self, newStrTm);
+        }
+
+        printf("INFO: Write access to %s -> value accepted\n", objRefBuf);
+
+        return DATA_ACCESS_ERROR_SUCCESS;
+    }
+    else {
+        printf("WARN: Write access to %s -> invalid value\n", objRefBuf);
+
+        return DATA_ACCESS_ERROR_OBJECT_VALUE_INVALID;
+    }
+}
+
+
 static MmsDataAccessError
 schdPrio_writeAccessHandler(DataAttribute* dataAttribute, MmsValue* value, ClientConnection connection, void* parameter)
 {
@@ -173,34 +362,185 @@ checkSyncInput(Schedule self)
     DataAttribute* inSyn_setSrcRef = (DataAttribute*)ModelNode_getChild((ModelNode*)self->scheduleLn, "InSyn.setSrcRef");
 
     if (inSyn_setSrcRef) {
-        printf("INFO: InSyn set to (%s)\n", MmsValue_toString(inSyn_setSrcRef->mmsValue));
+        const char* srcRef = MmsValue_toString(inSyn_setSrcRef->mmsValue);
+        
+        printf("INFO: InSyn set to (%s)\n", srcRef);
 
-        checkResult = true;
+        //TODO check if object reference is valid and a possible trigger signal
+
+        ModelNode* triggerSignal = IedModel_getModelNodeByShortObjectReference(self->model, srcRef);
+
+        if (triggerSignal) {
+            //TODO check if the trigger signal is a boolean or SPS (has "stVal" of type boolean)
+
+            if (triggerSignal->modelType == DataAttributeModelType) {
+                DataAttribute* triggerDa = (DataAttribute*)triggerSignal;
+
+                if (triggerDa->type == IEC61850_BOOLEAN) {
+                    printf("INFO: Trigger signal is valid\n");
+                    checkResult = true;
+                }
+            }
+        }
+        else {
+            printf("ERROR: Trigger signal %s not found\n", srcRef);
+        }
     }
 
     return checkResult;
 }
 
+static bool isTimeTriggered(Schedule self)
+{
+    // check if schedule has a StrTm object
+    bool hasStrTm = false;
+
+    LinkedList dataObjects = ModelNode_getChildren((ModelNode*)self->scheduleLn);
+
+    LinkedList doElem = LinkedList_getNext(dataObjects);
+
+    while (doElem) {
+        DataObject* dObj = (DataObject*)LinkedList_getData(doElem);
+
+        // check that data object name is "StrTmXXX"
+        if (checkIfStrTm(dObj->name)) {
+            hasStrTm = true;
+            break;
+        }
+
+        doElem = LinkedList_getNext(doElem);
+    }
+
+    LinkedList_destroyStatic(dataObjects);
+
+    return hasStrTm;
+}
+
+static bool isPeriodic(Schedule self)
+{
+
+}
+
+static void
+schedule_installWriteAccessHandlersForStrTm(Schedule self)
+{
+    LinkedList dataObjects = ModelNode_getChildren((ModelNode*)self->scheduleLn);
+
+    LinkedList doElem = LinkedList_getNext(dataObjects);
+
+    while (doElem) {
+        DataObject* dObj = (DataObject*)LinkedList_getData(doElem);
+
+        // check that data object name is "StrTmXXX"
+        if (checkIfStrTm(dObj->name)) {
+
+            DataAttribute* setTm = (DataAttribute*)ModelNode_getChild((ModelNode*)dObj, "setTm");
+
+            if (setTm) {
+                IedServer_handleWriteAccess(self->server, setTm, strTm_writeAccessHandler, self);            
+            }
+        }
+
+        doElem = LinkedList_getNext(doElem);
+    }
+
+    LinkedList_destroyStatic(dataObjects);
+}
+
+static uint64_t 
+getStartTime(DataObject* strTm)
+{
+    uint64_t strTmVal = 0;
+
+    DataAttribute* setTm = (DataAttribute*)ModelNode_getChild((ModelNode*)strTm, "setTm");
+
+    if (setTm) {
+        if (setTm->mmsValue) {
+            strTmVal = MmsValue_getUtcTimeInMs(setTm->mmsValue);
+        }
+    }
+
+    return strTmVal;
+}
+
+static bool checkForValidStartTimes(Schedule self)
+{
+    bool hasValidStartTimes = false;
+    //TODO check data objects for StrTm objects
+
+    uint64_t currentTime = Hal_getTimeInMs();
+
+    LinkedList dataObjects = ModelNode_getChildren((ModelNode*)self->scheduleLn);
+
+    LinkedList doElem = LinkedList_getNext(dataObjects);
+
+    while (doElem) {
+        DataObject* dObj = (DataObject*)LinkedList_getData(doElem);
+
+        // check that data object name is "StrTmXXX"
+        if (checkIfStrTm(dObj->name)) {
+            printf("INFO: Found start time: %s\n", dObj->name);
+
+            if (getStartTime(dObj) > currentTime) {
+                hasValidStartTimes = true;
+            }
+            else {
+                printf("     start time is in the past!\n");
+            }
+        }
+
+        doElem = LinkedList_getNext(doElem);
+    }
+
+    LinkedList_destroyStatic(dataObjects);
+
+    return hasValidStartTimes;
+}
+
 static bool
 enabledSchedule(Schedule self)
 {
+    ScheduleState newState = SCHD_STATE_NOT_READY;
     /* TODO check for conditions to enable schedule */
 
     //TODO check if a Start time (StrTm) is defined or an external trigger option is set (EvTeg == true}
     if (isEventDriven(self)) {
         if (checkSyncInput(self)) {
             printf("INFO: valid trigger info set\n");
+            newState = SCHD_STATE_READY;
         }
     }
-    else {
-
+    else if(isTimeTriggered(self)) {
+        if (checkForValidStartTimes(self)) {
+            printf("INFO: valid schedules found\n");
+            newState = SCHD_STATE_READY;
+        }
+        else {
+            schedule_updateScheduleEnableError(self, SCHD_ENA_ERR_MISSING_VALID_STRTM);
+        }
     }
+
+    schedule_udpateState(self, newState);
+
+    if (newState == SCHD_STATE_READY) {
+        uint64_t nextStartTime = schedule_getNextStartTime(self);
+
+        schedule_updateNxtStrTm(self, nextStartTime);
+
+        schedule_updateScheduleEnableError(self, SCHD_ENA_ERR_NONE);
+
+        return true;
+    }
+    else
+        return false;
 }
 
 static void
 disableSchedule(Schedule self)
 {
+    ScheduleState newState = SCHD_STATE_NOT_READY;
 
+    schedule_udpateState(self, newState);
 }
 
 static ControlHandlerResult 
@@ -234,8 +574,38 @@ schedule_controlHandler(ControlAction action, void* parameter, MmsValue* ctlVal,
     }
 }
 
+static void*
+schedule_thread(void* parameter)
+{
+    Schedule self = (Schedule)parameter;
+
+    if (self->alive) {
+
+        ScheduleState state = schedule_getState(self);
+
+        if (state == SCHD_STATE_READY) {
+            uint64_t currentTime = Hal_getTimeInMs();
+
+            if (currentTime > self->nextStartTime) {
+                //TODO update ActStrTm
+                //TODO update NextStrTm
+
+                self->nextStartTime = schedule_getNextStartTime(self);
+
+                if (self->nextStartTime == 0) {
+                    //TODO change to other state?
+                }
+
+                schedule_updateNxtStrTm(self, self->nextStartTime);
+            }
+        }
+
+        Thread_sleep(100);
+    }
+}
+
 Schedule
-Schedule_create(LogicalNode* schedLn, IedServer server)
+Schedule_create(LogicalNode* schedLn, IedServer server, IedModel* model)
 {
     Schedule self = NULL;
 
@@ -245,7 +615,6 @@ Schedule_create(LogicalNode* schedLn, IedServer server)
     ScheduleTargetType targetType = SCHD_TYPE_UNKNOWN;
 
     DataAttribute* schdPrio_setVal = NULL;
-
 
     ModelNode* schdSt = ModelNode_getChild((ModelNode*)schedLn, "SchdSt");
 
@@ -329,6 +698,7 @@ Schedule_create(LogicalNode* schedLn, IedServer server)
         if (self) {
             self->scheduleLn = schedLn;
             self->server = server;
+            self->model = model;
             self->enaReq = (DataObject*)enaReq;
             self->dsaReq = (DataObject*)dsaReq;
             self->schdSt = (DataObject*)schdSt;
@@ -348,14 +718,35 @@ Schedule_create(LogicalNode* schedLn, IedServer server)
 
             IedServer_handleWriteAccess(self->server, schdPrio_setVal, schdPrio_writeAccessHandler, self);
 
+            schedule_installWriteAccessHandlersForStrTm(self);
+
             IedServer_setControlHandler(self->server, self->dsaReq, schedule_controlHandler, self);
             IedServer_setControlHandler(self->server, self->enaReq, schedule_controlHandler, self);
 
             schedule_setState(self, SCHD_STATE_NOT_READY);
+
+            schedule_updateNxtStrTm(self, 0);
+
+            self->thread = Thread_create(schedule_thread, self, false);
+
+            self->alive = true;
+
+            Thread_start(self->thread);
         }
     }
 
     return self;
+}
+
+void
+Schedule_destroy(Schedule self)
+{
+    if (self) {
+        self->alive = false;
+        Thread_destroy(self->thread);
+
+        free(self);
+    }
 }
 
 void
@@ -439,7 +830,7 @@ Scheduler_parseModel(Scheduler self)
 
                     if (strstr(ln->name, "FSCH")) {
 
-                        Schedule sched = Schedule_create(ln, self->server);
+                        Schedule sched = Schedule_create(ln, self->server, self->model);
 
                         if (sched)
                             LinkedList_add(self->schedules, sched);
