@@ -12,4 +12,5 @@ add_executable(scheduler_example1
 
 target_link_libraries(scheduler_example1
     der_scheduler
+    m
 )

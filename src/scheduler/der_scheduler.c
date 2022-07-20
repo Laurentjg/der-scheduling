@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <math.h>
 
 typedef enum {
     SCHD_STATE_INVALID = 0,
@@ -292,6 +293,114 @@ schedule_getNextStartTime(Schedule self)
     return nextStartTime;
 }
 
+static int
+schedule_getNumberOfScheduleEntries(Schedule self)
+{
+    int scheduleEntryCount = 0;
+
+    char* multiObjStr = NULL;
+
+    if (self->targetType == SCHD_TYPE_MV) {
+        multiObjStr = "ValASG";
+    }
+    else if (self->targetType == SCHD_TYPE_ENS) {
+        multiObjStr = "ValING";
+    }
+    else if (self->targetType == SCHD_TYPE_INS) {
+        multiObjStr = "ValING";
+    }
+    else if (self->targetType == SCHD_TYPE_SPS) {
+        multiObjStr = "ValSPG";
+    }
+    else {
+        return 0;
+    }
+
+    LinkedList dataObjects = ModelNode_getChildren((ModelNode*)self->scheduleLn);
+
+    LinkedList doElem = LinkedList_getNext(dataObjects);
+
+    while (doElem) {
+        DataObject* dObj = (DataObject*)LinkedList_getData(doElem);
+
+        if (checkIfMultiObjInst(dObj->name, multiObjStr)) {
+            printf("Found schedule instance %s\n", dObj->name);
+            scheduleEntryCount++;
+        }
+
+        doElem = LinkedList_getNext(doElem);
+    }
+
+    LinkedList_destroyStatic(dataObjects);
+
+    printf("INFO: Schedule has %i elements\n", scheduleEntryCount);
+
+    return scheduleEntryCount;
+}
+
+/**
+ * @brief Get the schedule attribute with index idx (e.g. idx=3 => "ValASG1" or "ValASG01", ...)
+ * 
+ * @param self 
+ * @param idx 
+ * @return DataAttribute* 
+ */
+static DataAttribute*
+schedule_getScheduleValueAttribute(Schedule self, int idx)
+{
+    DataAttribute* valueAttr = NULL;
+
+    char attrNameBuf[100];
+
+    char* multiObjStr = NULL;
+
+    if (self->targetType == SCHD_TYPE_MV) {
+        multiObjStr = "ValASG";
+    }
+    else if (self->targetType == SCHD_TYPE_ENS) {
+        multiObjStr = "ValING";
+    }
+    else if (self->targetType == SCHD_TYPE_INS) {
+        multiObjStr = "ValING";
+    }
+    else if (self->targetType == SCHD_TYPE_SPS) {
+        multiObjStr = "ValSPG";
+    }
+    else {
+        return NULL;
+    }
+
+    sprintf(attrNameBuf, "%s%i", multiObjStr, idx);
+
+    valueAttr = (DataAttribute*)ModelNode_getChild((ModelNode*)self->scheduleLn, attrNameBuf);
+
+    if (valueAttr)
+        return valueAttr;
+
+    sprintf(attrNameBuf, "%s%02i", multiObjStr, idx);
+
+    valueAttr = (DataAttribute*)ModelNode_getChild((ModelNode*)self->scheduleLn, attrNameBuf);
+
+    if (valueAttr)
+        return valueAttr;
+
+    sprintf(attrNameBuf, "%s%03i", multiObjStr, idx);
+
+    valueAttr = (DataAttribute*)ModelNode_getChild((ModelNode*)self->scheduleLn, attrNameBuf);
+
+    if (valueAttr)
+        return valueAttr;
+
+    sprintf(attrNameBuf, "%s%04i", multiObjStr, idx);
+
+    valueAttr = (DataAttribute*)ModelNode_getChild((ModelNode*)self->scheduleLn, attrNameBuf);
+
+    if (valueAttr)
+        return valueAttr;
+
+    return NULL;
+}
+
 static MmsDataAccessError
 strTm_writeAccessHandler(DataAttribute* dataAttribute, MmsValue* value, ClientConnection connection, void* parameter)
 {
@@ -323,7 +432,6 @@ strTm_writeAccessHandler(DataAttribute* dataAttribute, MmsValue* value, ClientCo
         return DATA_ACCESS_ERROR_OBJECT_VALUE_INVALID;
     }
 }
-
 
 static MmsDataAccessError
 schdPrio_writeAccessHandler(DataAttribute* dataAttribute, MmsValue* value, ClientConnection connection, void* parameter)
@@ -497,6 +605,133 @@ static bool checkForValidStartTimes(Schedule self)
     return hasValidStartTimes;
 }
 
+static uint64_t
+getSchdIntvValueInMs(Schedule self)
+{
+    uint64_t interval = 0;
+
+    int multiplierEnumValue = 0;
+
+    int baseTime = 1; /* 1 second */
+
+    double multiPl = 1.0;
+
+    DataAttribute* unit = (DataAttribute*)ModelNode_getChild((ModelNode*)self->scheduleLn, "SchdIntv.units.SIUnit");
+
+    if (unit) {
+        if ((unit->mmsValue) && (MmsValue_getType(unit->mmsValue) == MMS_INTEGER)) {
+            int unitEnumValue = MmsValue_toInt32(unit->mmsValue);
+
+            if (unitEnumValue == 4) { /* second */
+                baseTime = 1;
+            }
+            else if (unitEnumValue == 84) { /* hour */
+                baseTime = 3600;
+            }
+            else if (unitEnumValue == 85) { /* minute */
+                baseTime = 60;
+            }
+            else {
+                printf("ERROR: invalid unit %i (has to be a time unit)\n", unitEnumValue);
+            }
+        }
+    }
+
+    DataAttribute* multiplier = (DataAttribute*)ModelNode_getChild((ModelNode*)self->scheduleLn, "SchdIntv.units.multiplier");
+
+    if (multiplier) {
+        if ((multiplier->mmsValue) && (MmsValue_getType(multiplier->mmsValue) == MMS_INTEGER)) {
+            multiplierEnumValue = MmsValue_toInt32(multiplier->mmsValue);
+
+            multiPl = pow(10, multiplierEnumValue);
+        }
+    }
+
+    DataAttribute* schdIntv = (DataAttribute*)ModelNode_getChild((ModelNode*)self->scheduleLn, "SchdIntv.setVal");
+
+    if (schdIntv) {
+        if ((schdIntv->mmsValue) && (MmsValue_getType(schdIntv->mmsValue) == MMS_INTEGER)) {
+            int schedIntvValue = MmsValue_toInt32(schdIntv->mmsValue);
+
+            double value = (schedIntvValue * baseTime * 1000) * multiPl;
+
+            interval = (uint64_t)value;
+        }
+    }
+
+    return interval;
+}
+
+static bool
+performGenericScheduleValidityChecks(Schedule self)
+{
+    /* check if NumEntr is valid */
+
+    DataAttribute* numEntr = (DataAttribute*)ModelNode_getChild((ModelNode*)self->scheduleLn, "NumEntr.setVal");
+
+    bool numEntrValid = false;
+
+    if (numEntr) {
+        if ((numEntr->mmsValue) && (MmsValue_getType(numEntr->mmsValue) == MMS_INTEGER)) {
+
+            int numEntrVal = MmsValue_toInt32(numEntr->mmsValue);
+
+            if (numEntrVal > 0) {
+
+                if (numEntrVal <= schedule_getNumberOfScheduleEntries(self)) {
+
+                    numEntrValid = true;
+
+                    int i;
+
+                    for (i = 1; i <= numEntrVal; i++) {
+                        if (schedule_getScheduleValueAttribute(self, i) == NULL) {
+                            numEntrValid = false;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    if (numEntrValid == false) {
+        schedule_updateScheduleEnableError(self, SCHD_ENA_ERR_MISSING_VALID_NUMENTR);
+
+        return false;
+    }
+
+    printf("INFO: NumEntr is valid\n");
+
+    /* check if SchdIntv is valied */
+
+    DataAttribute* schdIntv = (DataAttribute*)ModelNode_getChild((ModelNode*)self->scheduleLn, "SchdIntv.setVal");
+
+    bool schdIntvValid = false;
+
+    if (schdIntv) {
+        if ((schdIntv->mmsValue) && (MmsValue_getType(schdIntv->mmsValue) == MMS_INTEGER)) {
+            int schdIntvValue = MmsValue_toInt32(schdIntv->mmsValue);
+
+            if (schdIntvValue > 0) {
+                schdIntvValid = true;
+            }
+        }
+    }
+
+    if (schdIntvValid == false) {
+        schedule_updateScheduleEnableError(self, SCHD_ENA_ERR_MISSING_VALID_SCHDINTV);
+
+        return false;
+    }
+
+    printf("INFO: SchdIntv interval: %lu ms\n", getSchdIntvValueInMs(self));
+
+    printf("INFO: SchdIntv is valid\n");
+
+    return true;
+ }
+
 static bool
 enabledSchedule(Schedule self)
 {
@@ -504,19 +739,24 @@ enabledSchedule(Schedule self)
     /* TODO check for conditions to enable schedule */
 
     //TODO check if a Start time (StrTm) is defined or an external trigger option is set (EvTeg == true}
-    if (isEventDriven(self)) {
-        if (checkSyncInput(self)) {
-            printf("INFO: valid trigger info set\n");
-            newState = SCHD_STATE_READY;
+
+    if (performGenericScheduleValidityChecks(self)) {
+
+        if (isEventDriven(self)) {
+            if (checkSyncInput(self)) {
+                printf("INFO: valid trigger info set\n");
+                newState = SCHD_STATE_READY;
+            }
         }
-    }
-    else if(isTimeTriggered(self)) {
-        if (checkForValidStartTimes(self)) {
-            printf("INFO: valid schedules found\n");
-            newState = SCHD_STATE_READY;
-        }
-        else {
-            schedule_updateScheduleEnableError(self, SCHD_ENA_ERR_MISSING_VALID_STRTM);
+        else if(isTimeTriggered(self)) {
+
+            if (checkForValidStartTimes(self)) {
+                printf("INFO: valid schedules found\n");
+                newState = SCHD_STATE_READY;
+            }
+            else {
+                schedule_updateScheduleEnableError(self, SCHD_ENA_ERR_MISSING_VALID_STRTM);
+            }
         }
     }
 
