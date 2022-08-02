@@ -46,6 +46,11 @@ struct sSchedule {
 
     uint64_t nextStartTime;
 
+    uint64_t startTime; /* start time of current schedule execution */
+    int entryDurationInMs; /* duration of schedule entry in ms */
+    int numberOfScheduleEntries; /* number of valid schedule entries */
+    int currentEntryIdx;
+
     IedServer server;
     IedModel* model;
 
@@ -148,7 +153,7 @@ schedule_setState(Schedule self, ScheduleState newState)
     DataAttribute* schdSt_q = (DataAttribute*)ModelNode_getChild((ModelNode*)self->schdSt, "q");
     DataAttribute* schdSt_t = (DataAttribute*)ModelNode_getChild((ModelNode*)self->schdSt, "t");
 
-    IedServer_lockDataModel(self->server);
+   // IedServer_lockDataModel(self->server);
 
     if (schdSt_t) {
         Timestamp ts;
@@ -168,7 +173,7 @@ schedule_setState(Schedule self, ScheduleState newState)
         IedServer_updateInt32AttributeValue(self->server, schdSt_stVal, newState);
     }
 
-    IedServer_unlockDataModel(self->server);
+   // IedServer_unlockDataModel(self->server);
 }
 
 static void
@@ -338,6 +343,84 @@ schedule_getNumberOfScheduleEntries(Schedule self)
     return scheduleEntryCount;
 }
 
+static DataAttribute*
+schedule_getCurrentValueAttribute(Schedule self)
+{
+    DataAttribute* valueAttr = NULL;
+
+    char* objNameStr = NULL;
+
+    if (self->targetType == SCHD_TYPE_MV) {
+        objNameStr = "ValMV";
+    }
+    else if (self->targetType == SCHD_TYPE_ENS) {
+        objNameStr = "ValENS";
+    }
+    else if (self->targetType == SCHD_TYPE_INS) {
+        objNameStr = "ValINS";
+    }
+    else if (self->targetType == SCHD_TYPE_SPS) {
+        objNameStr = "ValSPS";
+    }
+    else {
+        return NULL;
+    }
+
+    valueAttr = (DataAttribute*)ModelNode_getChild((ModelNode*)self->scheduleLn, objNameStr);
+
+    if (valueAttr) {
+        
+        if (self->targetType == SCHD_TYPE_MV) {
+            valueAttr = (DataAttribute*)ModelNode_getChild((ModelNode*)valueAttr, "mag.f");
+
+            if (valueAttr == NULL)
+                valueAttr = (DataAttribute*)ModelNode_getChild((ModelNode*)valueAttr, "mag.i");
+        }
+        else {
+            valueAttr = (DataAttribute*)ModelNode_getChild((ModelNode*)valueAttr, "stVal");
+        }
+     
+        return valueAttr;
+    }
+
+    return NULL;
+}
+
+static DataAttribute*
+schedule_getCurrentValueSubAttribute(Schedule self, const char* attrName)
+{
+    DataAttribute* valueAttr = NULL;
+
+    char* objNameStr = NULL;
+
+    if (self->targetType == SCHD_TYPE_MV) {
+        objNameStr = "ValMV";
+    }
+    else if (self->targetType == SCHD_TYPE_ENS) {
+        objNameStr = "ValENS";
+    }
+    else if (self->targetType == SCHD_TYPE_INS) {
+        objNameStr = "ValINS";
+    }
+    else if (self->targetType == SCHD_TYPE_SPS) {
+        objNameStr = "ValSPS";
+    }
+    else {
+        return NULL;
+    }
+
+    valueAttr = (DataAttribute*)ModelNode_getChild((ModelNode*)self->scheduleLn, objNameStr);
+
+    if (valueAttr) {
+        
+        valueAttr = (DataAttribute*)ModelNode_getChild((ModelNode*)valueAttr, attrName);
+     
+        return valueAttr;
+    }
+
+    return NULL;
+}
+
 /**
  * @brief Get the schedule attribute with index idx (e.g. idx=3 => "ValASG1" or "ValASG01", ...)
  * 
@@ -371,32 +454,37 @@ schedule_getScheduleValueAttribute(Schedule self, int idx)
     }
 
     sprintf(attrNameBuf, "%s%i", multiObjStr, idx);
-
     valueAttr = (DataAttribute*)ModelNode_getChild((ModelNode*)self->scheduleLn, attrNameBuf);
 
-    if (valueAttr)
+    if (valueAttr == NULL) {
+        sprintf(attrNameBuf, "%s%02i", multiObjStr, idx);
+        valueAttr = (DataAttribute*)ModelNode_getChild((ModelNode*)self->scheduleLn, attrNameBuf);
+    }
+
+    if (valueAttr == NULL) {
+        sprintf(attrNameBuf, "%s%03i", multiObjStr, idx);
+        valueAttr = (DataAttribute*)ModelNode_getChild((ModelNode*)self->scheduleLn, attrNameBuf);
+    }
+
+    if (valueAttr == NULL) {
+        sprintf(attrNameBuf, "%s%04i", multiObjStr, idx);
+        valueAttr = (DataAttribute*)ModelNode_getChild((ModelNode*)self->scheduleLn, attrNameBuf);
+    };
+
+    if (valueAttr) {
+        
+        if (self->targetType == SCHD_TYPE_MV) {
+            valueAttr = (DataAttribute*)ModelNode_getChild((ModelNode*)valueAttr, "setMag.f");
+
+            if (valueAttr == NULL)
+                valueAttr = (DataAttribute*)ModelNode_getChild((ModelNode*)valueAttr, "setMag.i");
+        }
+        else {
+            valueAttr = (DataAttribute*)ModelNode_getChild((ModelNode*)valueAttr, "setVal");
+        }
+     
         return valueAttr;
-
-    sprintf(attrNameBuf, "%s%02i", multiObjStr, idx);
-
-    valueAttr = (DataAttribute*)ModelNode_getChild((ModelNode*)self->scheduleLn, attrNameBuf);
-
-    if (valueAttr)
-        return valueAttr;
-
-    sprintf(attrNameBuf, "%s%03i", multiObjStr, idx);
-
-    valueAttr = (DataAttribute*)ModelNode_getChild((ModelNode*)self->scheduleLn, attrNameBuf);
-
-    if (valueAttr)
-        return valueAttr;
-
-    sprintf(attrNameBuf, "%s%04i", multiObjStr, idx);
-
-    valueAttr = (DataAttribute*)ModelNode_getChild((ModelNode*)self->scheduleLn, attrNameBuf);
-
-    if (valueAttr)
-        return valueAttr;
+    }
 
     return NULL;
 }
@@ -814,19 +902,98 @@ schedule_controlHandler(ControlAction action, void* parameter, MmsValue* ctlVal,
     }
 }
 
+static int
+schedule_getCurrentIdx(Schedule self, uint64_t currentTime)
+{
+    int currentIdx = (currentTime - self->startTime) / self->entryDurationInMs;
+
+    if (currentIdx > self->numberOfScheduleEntries) 
+        currentIdx = -1;
+
+    return currentIdx;
+}
+
+static void
+schedule_updateCurrentValue(Schedule self, uint64_t currentTime, MmsValue* value)
+{
+    DataAttribute* currentValAttr = schedule_getCurrentValueAttribute(self);
+
+    if (currentValAttr) {
+        DataAttribute* q = schedule_getCurrentValueSubAttribute(self, "q");
+        DataAttribute* t = schedule_getCurrentValueSubAttribute(self, "t");
+
+        IedServer_lockDataModel(self->server);
+
+        IedServer_updateAttributeValue(self->server, currentValAttr, value);
+
+        if (t) {
+            //TODO change to IedServer_updateTimestampAttributeValue 
+            IedServer_updateUTCTimeAttributeValue(self->server, t, currentTime);
+        }
+
+        if (q) {
+            IedServer_updateQuality(self->server, q, QUALITY_VALIDITY_GOOD);
+        }
+
+        IedServer_unlockDataModel(self->server);
+    }
+}
+
+static void
+schedule_updateSchdEntr(Schedule self, uint64_t currentTime, int idx)
+{
+    DataAttribute* schdEntr_stVal = (DataAttribute*)ModelNode_getChild((ModelNode*)self->scheduleLn, "SchdEntr.stVal");
+
+    if (schdEntr_stVal) {
+        DataAttribute* schdEntr_t = (DataAttribute*)ModelNode_getChild((ModelNode*)self->scheduleLn, "SchdEntr.t");
+
+        IedServer_lockDataModel(self->server);
+
+        if (schdEntr_t) {
+            //TODO change to IedServer_updateTimestampAttributeValue 
+            IedServer_updateUTCTimeAttributeValue(self->server, schdEntr_t, currentTime);
+        }
+
+        IedServer_updateInt32AttributeValue(self->server, schdEntr_stVal, idx);
+
+        IedServer_unlockDataModel(self->server);
+    }
+}
+
 static void*
 schedule_thread(void* parameter)
 {
     Schedule self = (Schedule)parameter;
 
-    if (self->alive) {
+    while (self->alive) {
 
         ScheduleState state = schedule_getState(self);
 
-        if (state == SCHD_STATE_READY) {
-            uint64_t currentTime = Hal_getTimeInMs();
+        uint64_t currentTime = Hal_getTimeInMs();
 
-            if (currentTime > self->nextStartTime) {
+        ScheduleState newState = state;
+
+        if (state == SCHD_STATE_READY) {
+
+            printf("INFO: state: ready\n");
+            printf("INFO:     current time: %lu\n", currentTime);
+            printf("INFO:     next start  : %lu\n", self->nextStartTime);
+
+            if (self->nextStartTime == 0) {
+                self->nextStartTime = schedule_getNextStartTime(self);
+            }
+            
+            if ((self->nextStartTime != 0) && (currentTime > self->nextStartTime)) {
+
+                self->startTime = self->nextStartTime;
+                self->entryDurationInMs = getSchdIntvValueInMs(self);
+                self->numberOfScheduleEntries = schedule_getNumberOfScheduleEntries(self);
+                self->currentEntryIdx = -2;
+
+                /* calculate current index */
+                int currentIdx = schedule_getCurrentIdx(self, currentTime);
+                
+
                 //TODO update ActStrTm
                 //TODO update NextStrTm
 
@@ -837,8 +1004,66 @@ schedule_thread(void* parameter)
                 }
 
                 schedule_updateNxtStrTm(self, self->nextStartTime);
+
+                newState = SCHD_STATE_RUNNING;
+                printf("INFO: Schedule switchted to running state\n");
             }
         }
+        else if (state == SCHD_STATE_RUNNING) {
+
+            int currentIdx = schedule_getCurrentIdx(self, currentTime);
+
+            printf("INFO: state: ready (idx: %i/%i)\n", currentIdx, self->currentEntryIdx);
+
+            if (currentIdx != self->currentEntryIdx) {
+                DataAttribute* valueAttr = schedule_getScheduleValueAttribute(self, currentIdx + 1);
+
+                if (valueAttr) {
+                    char objRef[130];
+
+                    ModelNode_getObjectReferenceEx((ModelNode*)valueAttr, objRef, true);
+
+                    printf("Found schdule entry: %s\n", objRef);
+
+                    MmsValue* val = valueAttr->mmsValue;
+
+                    printf("  val: %p\n", val);
+
+                    if (val) {
+                        char valBuf[256];
+
+                        MmsValue_printToBuffer(val, valBuf, 256);
+
+                        printf("INFO: schedule value [%i]: %s\n", currentIdx, valBuf);
+
+                        // update ValMV, ValINS, ValSPS, ValENS
+                        schedule_updateCurrentValue(self, currentTime, val);
+            
+                        schedule_updateSchdEntr(self, currentTime, currentIdx + 1);
+                    }
+                }
+                else {
+                    printf("ERROR: no schedule entry found for idx: %i\n", currentIdx + 1);
+                }
+
+                self->currentEntryIdx = currentIdx;
+            }
+            else {
+
+                if (currentIdx == -1) {
+                    printf("INFO: schedule ended\n");
+
+                    //TODO check for next state
+
+                    newState = SCHD_STATE_NOT_READY;
+                }
+
+            }
+        }
+
+        if (newState != state) {
+            schedule_setState(self, newState);
+        }        
 
         Thread_sleep(100);
     }
