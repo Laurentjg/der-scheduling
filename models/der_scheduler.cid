@@ -83,52 +83,52 @@
             </DOI>
             <DOI name="Schd01">
               <DAI name="setSrcRef">
-                <Val>@Control/ActPow_NP_FSCH01</Val>
+                <Val>@Control/ActPow_FSCH01</Val>
               </DAI>
             </DOI>
             <DOI name="Schd02">
               <DAI name="setSrcRef">
-                <Val>@Control/ActPow_NP_FSCH02</Val>
+                <Val>@Control/ActPow_FSCH02</Val>
               </DAI>
             </DOI>
             <DOI name="Schd03">
               <DAI name="setSrcRef">
-                <Val>@Control/ActPow_NP_FSCH03</Val>
+                <Val>@Control/ActPow_FSCH03</Val>
               </DAI>
             </DOI>
             <DOI name="Schd04">
               <DAI name="setSrcRef">
-                <Val>@Control/ActPow_NP_FSCH04</Val>
+                <Val>@Control/ActPow_FSCH04</Val>
               </DAI>
             </DOI>
             <DOI name="Schd05">
               <DAI name="setSrcRef">
-                <Val>@Control/ActPow_P_FSCH01</Val>
+                <Val>@Control/ActPow_FSCH05</Val>
               </DAI>
             </DOI>
             <DOI name="Schd06">
               <DAI name="setSrcRef">
-                <Val>@Control/ActPow_P_FSCH02</Val>
+                <Val>@Control/ActPow_FSCH06</Val>
               </DAI>
             </DOI>
             <DOI name="Schd07">
               <DAI name="setSrcRef">
-                <Val>@Control/ActPow_P_FSCH03</Val>
+                <Val>@Control/ActPow_FSCH07</Val>
               </DAI>
             </DOI>
             <DOI name="Schd08">
               <DAI name="setSrcRef">
-                <Val>@Control/ActPow_P_FSCH04</Val>
+                <Val>@Control/ActPow_FSCH08</Val>
               </DAI>
             </DOI>
             <DOI name="Schd09">
               <DAI name="setSrcRef">
-                <Val>@Control/ActPow_EV_FSCH01</Val>
+                <Val>@Control/ActPow_FSCH09</Val>
               </DAI>
             </DOI>
             <DOI name="Schd10">
               <DAI name="setSrcRef">
-                <Val>@Control/ActPow_EV_FSCH02</Val>
+                <Val>@Control/ActPow_FSCH10</Val>
               </DAI>
             </DOI>
           </LN>
@@ -140,52 +140,52 @@
             </DOI>
             <DOI name="Schd01">
               <DAI name="setSrcRef">
-                <Val>@Control/MaxPow_NP_FSCH01</Val>
+                <Val>@Control/MaxPow_FSCH01</Val>
               </DAI>
             </DOI>
             <DOI name="Schd02">
               <DAI name="setSrcRef">
-                <Val>@Control/MaxPow_NP_FSCH02</Val>
+                <Val>@Control/MaxPow_FSCH02</Val>
               </DAI>
             </DOI>
             <DOI name="Schd03">
               <DAI name="setSrcRef">
-                <Val>@Control/MaxPow_NP_FSCH03</Val>
+                <Val>@Control/MaxPow_FSCH03</Val>
               </DAI>
             </DOI>
             <DOI name="Schd04">
               <DAI name="setSrcRef">
-                <Val>@Control/MaxPow_NP_FSCH04</Val>
+                <Val>@Control/MaxPow_FSCH04</Val>
               </DAI>
             </DOI>
             <DOI name="Schd05">
               <DAI name="setSrcRef">
-                <Val>@Control/MaxPow_P_FSCH01</Val>
+                <Val>@Control/MaxPow_FSCH05</Val>
               </DAI>
             </DOI>
             <DOI name="Schd06">
               <DAI name="setSrcRef">
-                <Val>@Control/MaxPow_P_FSCH02</Val>
+                <Val>@Control/MaxPow_FSCH06</Val>
               </DAI>
             </DOI>
             <DOI name="Schd07">
               <DAI name="setSrcRef">
-                <Val>@Control/MaxPow_P_FSCH03</Val>
+                <Val>@Control/MaxPow_FSCH07</Val>
               </DAI>
             </DOI>
             <DOI name="Schd08">
               <DAI name="setSrcRef">
-                <Val>@Control/MaxPow_P_FSCH04</Val>
+                <Val>@Control/MaxPow_FSCH08</Val>
               </DAI>
             </DOI>
             <DOI name="Schd09">
               <DAI name="setSrcRef">
-                <Val>@Control/MaxPow_EV_FSCH01</Val>
+                <Val>@Control/MaxPow_FSCH09</Val>
               </DAI>
             </DOI>
             <DOI name="Schd10">
               <DAI name="setSrcRef">
-                <Val>@Control/MaxPow_EV_FSCH02</Val>
+                <Val>@Control/MaxPow_FSCH10</Val>
               </DAI>
             </DOI>
           </LN>
@@ -197,299 +197,259 @@
             </DOI>
             <DOI name="Schd01">
               <DAI name="setSrcRef">
-                <Val>@Control/OnOff_NP_FSCH01</Val>
+                <Val>@Control/OnOff_FSCH01</Val>
               </DAI>
             </DOI>
             <DOI name="Schd02">
               <DAI name="setSrcRef">
-                <Val>@Control/OnOff_NP_FSCH02</Val>
+                <Val>@Control/OnOff_FSCH02</Val>
               </DAI>
             </DOI>
             <DOI name="Schd03">
               <DAI name="setSrcRef">
-                <Val>@Control/OnOff_NP_FSCH03</Val>
+                <Val>@Control/OnOff_FSCH03</Val>
               </DAI>
             </DOI>
             <DOI name="Schd04">
               <DAI name="setSrcRef">
-                <Val>@Control/OnOff_NP_FSCH04</Val>
+                <Val>@Control/OnOff_FSCH04</Val>
               </DAI>
             </DOI>
             <DOI name="Schd05">
               <DAI name="setSrcRef">
-                <Val>@Control/OnOff_P_FSCH01</Val>
+                <Val>@Control/OnOff_FSCH05</Val>
               </DAI>
             </DOI>
             <DOI name="Schd06">
               <DAI name="setSrcRef">
-                <Val>@Control/OnOff_P_FSCH02</Val>
+                <Val>@Control/OnOff_FSCH06</Val>
               </DAI>
             </DOI>
             <DOI name="Schd07">
               <DAI name="setSrcRef">
-                <Val>@Control/OnOff_P_FSCH03</Val>
+                <Val>@Control/OnOff_FSCH07</Val>
               </DAI>
             </DOI>
             <DOI name="Schd08">
               <DAI name="setSrcRef">
-                <Val>@Control/OnOff_P_FSCH04</Val>
+                <Val>@Control/OnOff_FSCH08</Val>
               </DAI>
             </DOI>
             <DOI name="Schd09">
               <DAI name="setSrcRef">
-                <Val>@Control/OnOff_EV_FSCH01</Val>
+                <Val>@Control/OnOff_FSCH09</Val>
               </DAI>
             </DOI>
             <DOI name="Schd10">
               <DAI name="setSrcRef">
-                <Val>@Control/OnOff_EV_FSCH02</Val>
+                <Val>@Control/OnOff_FSCH10</Val>
               </DAI>
             </DOI>
           </LN>
-          <LN lnClass="FSCH" prefix="ActPow_NP_" inst="01" lnType="DERScheduler_FSCH_ASG_100_nonperiodic">
+          <LN lnClass="FSCH" prefix="ActPow_" inst="01" lnType="DERScheduler_FSCH_ASG_100_nonperiodic">
             <DOI name="NumEntr">
               <DAI name="setVal">
                 <Val>100</Val>
               </DAI>
             </DOI>
           </LN>
-          <LN lnClass="FSCH" prefix="ActPow_NP_" inst="02" lnType="DERScheduler_FSCH_ASG_100_nonperiodic">
+          <LN lnClass="FSCH" prefix="ActPow_" inst="02" lnType="DERScheduler_FSCH_ASG_100_nonperiodic">
             <DOI name="NumEntr">
               <DAI name="setVal">
                 <Val>100</Val>
               </DAI>
             </DOI>
           </LN>
-          <LN lnClass="FSCH" prefix="ActPow_NP_" inst="03" lnType="DERScheduler_FSCH_ASG_100_nonperiodic">
+          <LN lnClass="FSCH" prefix="ActPow_" inst="03" lnType="DERScheduler_FSCH_ASG_100_nonperiodic">
             <DOI name="NumEntr">
               <DAI name="setVal">
                 <Val>100</Val>
               </DAI>
             </DOI>
           </LN>
-          <LN lnClass="FSCH" prefix="ActPow_NP_" inst="04" lnType="DERScheduler_FSCH_ASG_100_nonperiodic">
+          <LN lnClass="FSCH" prefix="ActPow_" inst="04" lnType="DERScheduler_FSCH_ASG_100_nonperiodic">
             <DOI name="NumEntr">
               <DAI name="setVal">
                 <Val>100</Val>
               </DAI>
             </DOI>
           </LN>
-          <LN lnClass="FSCH" prefix="ActPow_P_" inst="01" lnType="DERScheduler_FSCH_ASG_100_periodic">
+          <LN lnClass="FSCH" prefix="ActPow_" inst="05" lnType="DERScheduler_FSCH_ASG_100_nonperiodic">
             <DOI name="NumEntr">
               <DAI name="setVal">
                 <Val>100</Val>
               </DAI>
             </DOI>
           </LN>
-          <LN lnClass="FSCH" prefix="ActPow_P_" inst="02" lnType="DERScheduler_FSCH_ASG_100_periodic">
+          <LN lnClass="FSCH" prefix="ActPow_" inst="06" lnType="DERScheduler_FSCH_ASG_100_nonperiodic">
             <DOI name="NumEntr">
               <DAI name="setVal">
                 <Val>100</Val>
               </DAI>
             </DOI>
           </LN>
-          <LN lnClass="FSCH" prefix="ActPow_P_" inst="03" lnType="DERScheduler_FSCH_ASG_100_periodic">
+          <LN lnClass="FSCH" prefix="ActPow_" inst="07" lnType="DERScheduler_FSCH_ASG_100_nonperiodic">
             <DOI name="NumEntr">
               <DAI name="setVal">
                 <Val>100</Val>
               </DAI>
             </DOI>
           </LN>
-          <LN lnClass="FSCH" prefix="ActPow_P_" inst="04" lnType="DERScheduler_FSCH_ASG_100_periodic">
+          <LN lnClass="FSCH" prefix="ActPow_" inst="08" lnType="DERScheduler_FSCH_ASG_100_nonperiodic">
             <DOI name="NumEntr">
               <DAI name="setVal">
                 <Val>100</Val>
               </DAI>
             </DOI>
           </LN>
-          <LN lnClass="FSCH" prefix="ActPow_EV_" inst="01" lnType="DERScheduler_FSCH_ASG_100_event">
-            <DOI name="NumEntr">
-              <DAI name="setVal">
-                <Val>100</Val>
-              </DAI>
-            </DOI>
-            <DOI name="EvTrg">
-              <DAI name="setVal">
-                <Val>true</Val>
-              </DAI>
-            </DOI>
-            <DOI name="SchdReuse">
-              <DAI name="setVal">
-                <Val>true</Val>
-              </DAI>
-            </DOI>
-          </LN>
-          <LN lnClass="FSCH" prefix="ActPow_EV_" inst="02" lnType="DERScheduler_FSCH_ASG_100_event">
-            <DOI name="NumEntr">
-              <DAI name="setVal">
-                <Val>100</Val>
-              </DAI>
-            </DOI>
-            <DOI name="EvTrg">
-              <DAI name="setVal">
-                <Val>true</Val>
-              </DAI>
-            </DOI>
-            <DOI name="SchdReuse">
-              <DAI name="setVal">
-                <Val>true</Val>
-              </DAI>
-            </DOI>
-          </LN>
-          <LN lnClass="FSCH" prefix="MaxPow_NP_" inst="01" lnType="DERScheduler_FSCH_ASG_100_nonperiodic">
+          <LN lnClass="FSCH" prefix="ActPow_" inst="09" lnType="DERScheduler_FSCH_ASG_100_nonperiodic">
             <DOI name="NumEntr">
               <DAI name="setVal">
                 <Val>100</Val>
               </DAI>
             </DOI>
           </LN>
-          <LN lnClass="FSCH" prefix="MaxPow_NP_" inst="02" lnType="DERScheduler_FSCH_ASG_100_nonperiodic">
+          <LN lnClass="FSCH" prefix="ActPow_" inst="10" lnType="DERScheduler_FSCH_ASG_100_nonperiodic">
             <DOI name="NumEntr">
               <DAI name="setVal">
                 <Val>100</Val>
               </DAI>
             </DOI>
           </LN>
-          <LN lnClass="FSCH" prefix="MaxPow_NP_" inst="03" lnType="DERScheduler_FSCH_ASG_100_nonperiodic">
+          <LN lnClass="FSCH" prefix="MaxPow_" inst="01" lnType="DERScheduler_FSCH_ASG_100_nonperiodic">
             <DOI name="NumEntr">
               <DAI name="setVal">
                 <Val>100</Val>
               </DAI>
             </DOI>
           </LN>
-          <LN lnClass="FSCH" prefix="MaxPow_NP_" inst="04" lnType="DERScheduler_FSCH_ASG_100_nonperiodic">
+          <LN lnClass="FSCH" prefix="MaxPow_" inst="02" lnType="DERScheduler_FSCH_ASG_100_nonperiodic">
             <DOI name="NumEntr">
               <DAI name="setVal">
                 <Val>100</Val>
               </DAI>
             </DOI>
           </LN>
-          <LN lnClass="FSCH" prefix="MaxPow_P_" inst="01" lnType="DERScheduler_FSCH_ASG_100_periodic">
+          <LN lnClass="FSCH" prefix="MaxPow_" inst="03" lnType="DERScheduler_FSCH_ASG_100_nonperiodic">
             <DOI name="NumEntr">
               <DAI name="setVal">
                 <Val>100</Val>
               </DAI>
             </DOI>
           </LN>
-          <LN lnClass="FSCH" prefix="MaxPow_P_" inst="02" lnType="DERScheduler_FSCH_ASG_100_periodic">
+          <LN lnClass="FSCH" prefix="MaxPow_" inst="04" lnType="DERScheduler_FSCH_ASG_100_nonperiodic">
             <DOI name="NumEntr">
               <DAI name="setVal">
                 <Val>100</Val>
               </DAI>
             </DOI>
           </LN>
-          <LN lnClass="FSCH" prefix="MaxPow_P_" inst="03" lnType="DERScheduler_FSCH_ASG_100_periodic">
+          <LN lnClass="FSCH" prefix="MaxPow_" inst="05" lnType="DERScheduler_FSCH_ASG_100_nonperiodic">
             <DOI name="NumEntr">
               <DAI name="setVal">
                 <Val>100</Val>
               </DAI>
             </DOI>
           </LN>
-          <LN lnClass="FSCH" prefix="MaxPow_P_" inst="04" lnType="DERScheduler_FSCH_ASG_100_periodic">
+          <LN lnClass="FSCH" prefix="MaxPow_" inst="06" lnType="DERScheduler_FSCH_ASG_100_nonperiodic">
             <DOI name="NumEntr">
               <DAI name="setVal">
                 <Val>100</Val>
               </DAI>
             </DOI>
           </LN>
-          <LN lnClass="FSCH" prefix="MaxPow_EV_" inst="01" lnType="DERScheduler_FSCH_ASG_100_event">
-            <DOI name="NumEntr">
-              <DAI name="setVal">
-                <Val>100</Val>
-              </DAI>
-            </DOI>
-            <DOI name="EvTrg">
-              <DAI name="setVal">
-                <Val>true</Val>
-              </DAI>
-            </DOI>
-            <DOI name="SchdReuse">
-              <DAI name="setVal">
-                <Val>true</Val>
-              </DAI>
-            </DOI>
-          </LN>
-          <LN lnClass="FSCH" prefix="MaxPow_EV_" inst="02" lnType="DERScheduler_FSCH_ASG_100_event">
-            <DOI name="NumEntr">
-              <DAI name="setVal">
-                <Val>100</Val>
-              </DAI>
-            </DOI>
-            <DOI name="EvTrg">
-              <DAI name="setVal">
-                <Val>true</Val>
-              </DAI>
-            </DOI>
-            <DOI name="SchdReuse">
-              <DAI name="setVal">
-                <Val>true</Val>
-              </DAI>
-            </DOI>
-          </LN>
-          <LN lnClass="FSCH" prefix="OnOff_NP_" inst="01" lnType="DERScheduler_FSCH_SPG_100_nonperiodic">
+          <LN lnClass="FSCH" prefix="MaxPow_" inst="07" lnType="DERScheduler_FSCH_ASG_100_nonperiodic">
             <DOI name="NumEntr">
               <DAI name="setVal">
                 <Val>100</Val>
               </DAI>
             </DOI>
           </LN>
-          <LN lnClass="FSCH" prefix="OnOff_NP_" inst="02" lnType="DERScheduler_FSCH_SPG_100_nonperiodic">
+          <LN lnClass="FSCH" prefix="MaxPow_" inst="08" lnType="DERScheduler_FSCH_ASG_100_nonperiodic">
             <DOI name="NumEntr">
               <DAI name="setVal">
                 <Val>100</Val>
               </DAI>
             </DOI>
           </LN>
-          <LN lnClass="FSCH" prefix="OnOff_NP_" inst="03" lnType="DERScheduler_FSCH_SPG_100_nonperiodic">
+          <LN lnClass="FSCH" prefix="MaxPow_" inst="09" lnType="DERScheduler_FSCH_ASG_100_nonperiodic">
             <DOI name="NumEntr">
               <DAI name="setVal">
                 <Val>100</Val>
               </DAI>
             </DOI>
           </LN>
-          <LN lnClass="FSCH" prefix="OnOff_NP_" inst="04" lnType="DERScheduler_FSCH_SPG_100_nonperiodic">
+          <LN lnClass="FSCH" prefix="MaxPow_" inst="10" lnType="DERScheduler_FSCH_ASG_100_nonperiodic">
             <DOI name="NumEntr">
               <DAI name="setVal">
                 <Val>100</Val>
               </DAI>
             </DOI>
           </LN>
-          <LN lnClass="FSCH" prefix="OnOff_P_" inst="01" lnType="DERScheduler_FSCH_SPG_100_periodic">
+          <LN lnClass="FSCH" prefix="OnOff_" inst="01" lnType="DERScheduler_FSCH_SPG_100_nonperiodic">
             <DOI name="NumEntr">
               <DAI name="setVal">
                 <Val>100</Val>
               </DAI>
             </DOI>
           </LN>
-          <LN lnClass="FSCH" prefix="OnOff_P_" inst="02" lnType="DERScheduler_FSCH_SPG_100_periodic">
+          <LN lnClass="FSCH" prefix="OnOff_" inst="02" lnType="DERScheduler_FSCH_SPG_100_nonperiodic">
             <DOI name="NumEntr">
               <DAI name="setVal">
                 <Val>100</Val>
               </DAI>
             </DOI>
           </LN>
-          <LN lnClass="FSCH" prefix="OnOff_P_" inst="03" lnType="DERScheduler_FSCH_SPG_100_periodic">
+          <LN lnClass="FSCH" prefix="OnOff_" inst="03" lnType="DERScheduler_FSCH_SPG_100_nonperiodic">
             <DOI name="NumEntr">
               <DAI name="setVal">
                 <Val>100</Val>
               </DAI>
             </DOI>
           </LN>
-          <LN lnClass="FSCH" prefix="OnOff_P_" inst="04" lnType="DERScheduler_FSCH_SPG_100_periodic">
+          <LN lnClass="FSCH" prefix="OnOff_" inst="04" lnType="DERScheduler_FSCH_SPG_100_nonperiodic">
             <DOI name="NumEntr">
               <DAI name="setVal">
                 <Val>100</Val>
               </DAI>
             </DOI>
           </LN>
-          <LN lnClass="FSCH" prefix="OnOff_EV_" inst="01" lnType="DERScheduler_FSCH_SPG_100_event">
+          <LN lnClass="FSCH" prefix="OnOff_" inst="05" lnType="DERScheduler_FSCH_SPG_100_nonperiodic">
             <DOI name="NumEntr">
               <DAI name="setVal">
                 <Val>100</Val>
               </DAI>
             </DOI>
           </LN>
-          <LN lnClass="FSCH" prefix="OnOff_EV_" inst="02" lnType="DERScheduler_FSCH_SPG_100_event">
+          <LN lnClass="FSCH" prefix="OnOff_" inst="06" lnType="DERScheduler_FSCH_SPG_100_nonperiodic">
+            <DOI name="NumEntr">
+              <DAI name="setVal">
+                <Val>100</Val>
+              </DAI>
+            </DOI>
+          </LN>
+          <LN lnClass="FSCH" prefix="OnOff_" inst="07" lnType="DERScheduler_FSCH_SPG_100_nonperiodic">
+            <DOI name="NumEntr">
+              <DAI name="setVal">
+                <Val>100</Val>
+              </DAI>
+            </DOI>
+          </LN>
+          <LN lnClass="FSCH" prefix="OnOff_" inst="08" lnType="DERScheduler_FSCH_SPG_100_nonperiodic">
+            <DOI name="NumEntr">
+              <DAI name="setVal">
+                <Val>100</Val>
+              </DAI>
+            </DOI>
+          </LN>
+          <LN lnClass="FSCH" prefix="OnOff_" inst="09" lnType="DERScheduler_FSCH_SPG_100_nonperiodic">
+            <DOI name="NumEntr">
+              <DAI name="setVal">
+                <Val>100</Val>
+              </DAI>
+            </DOI>
+          </LN>
+          <LN lnClass="FSCH" prefix="OnOff_" inst="10" lnType="DERScheduler_FSCH_SPG_100_nonperiodic">
             <DOI name="NumEntr">
               <DAI name="setVal">
                 <Val>100</Val>
