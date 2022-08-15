@@ -61,6 +61,7 @@ struct sScheduleController {
 
     LogicalNode* controllerLn;
     IedServer server;
+    Scheduler scheduler;
 };
 
 struct sScheduler
@@ -72,10 +73,19 @@ struct sScheduler
 };
 
 ScheduleController
-ScheduleController_create(LogicalNode* fsccLn, IedServer server);
+ScheduleController_create(LogicalNode* fsccLn, Scheduler scheduler);
+
+void
+ScheduleController_destroy(ScheduleController self);
 
 void
 scheduleController_schedulePrioUpdated(ScheduleController self, Schedule sched, int newPrio);
+
+void
+ScheduleController_initialize(ScheduleController self);
+
+Schedule
+Schedule_create(LogicalNode* schedLn, IedServer server, IedModel* model);
 
 int
 Schedule_getPrio(Schedule self);
@@ -85,3 +95,12 @@ Schedule_isRunning(Schedule self);
 
 void
 Schedule_destroy(Schedule self);
+
+bool 
+scheduler_checkIfMultiObjInst(const char* name, const char* multiName);
+
+Schedule
+Scheduler_getScheduleByObjRef(Scheduler self, const char* objRef);
+
+void
+Schedule_setListeningController(Schedule self, ScheduleController controller);
