@@ -3,6 +3,8 @@
 #include <signal.h>
 #include <stdio.h>
 
+#include <libiec61850/hal_thread.h>
+
 static bool running = false;
 
 static void
