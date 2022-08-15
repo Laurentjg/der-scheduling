@@ -137,15 +137,127 @@ scheduleController_scheduleValueUpdated(ScheduleController self, Schedule sched)
 }
 
 ScheduleController
-ScheduleController_create(LogicalNode* fsccLn, IedServer server)
+ScheduleController_create(LogicalNode* fsccLn, Scheduler scheduler)
 {
     ScheduleController self = (ScheduleController)calloc(1, sizeof(struct sScheduleController));
 
     if (self) {
         self->controllerLn = fsccLn;
-        self->server = server;
+        self->server = scheduler->server;
+        self->scheduler = scheduler;
+        self->schedules = LinkedList_create();
     }
 
     return self;
+}
+
+void
+ScheduleController_destroy(ScheduleController self)
+{
+    if (self) {
+
+        LinkedList_destroyStatic(self->schedules);
+
+        free(self);
+    }
+}
+
+static MmsDataAccessError
+schd_setSrcRef_writeAccessHandler(DataAttribute* dataAttribute, MmsValue* value, ClientConnection connection, void* parameter)
+{
+    ScheduleController self = (ScheduleController)parameter;
+
+    const char* scheduleRef = MmsValue_toString(value);
+    printf("INFO:   -> schedule: %s\n", scheduleRef);
+
+    Schedule sched = Scheduler_getScheduleByObjRef(self->scheduler, scheduleRef);
+
+    if (sched) {
+        printf("INFO:       -> schedule found\n");
+    }
+    else {
+        printf("ERROR: schedule %s not found\n", scheduleRef);
+        return DATA_ACCESS_ERROR_OBJECT_VALUE_INVALID;
+    }
+
+    if (LinkedList_contains(self->schedules, sched)) {
+        printf("ERROR: schedule %s already conntected with schedule controller\n", scheduleRef);
+        return DATA_ACCESS_ERROR_OBJECT_VALUE_INVALID;
+    }
+
+    if (dataAttribute->mmsValue) {
+        const char* oldScheduleRef = MmsValue_toString(dataAttribute->mmsValue);
+
+        Schedule oldSchedule = Scheduler_getScheduleByObjRef(self->scheduler, oldScheduleRef);
+
+        if (oldSchedule) {
+            printf("WARNING: disconnect schedule %s from schedule controller\n", oldScheduleRef);
+
+            //TODO how to handle the situation when multiple Schd have the same reference?
+
+            //TODO remove listener??? (or remove automatically when called from unknown schedule?)
+
+            LinkedList_remove(self->schedules, oldSchedule);
+        }
+    }
+
+    printf("INFO: connect schedule %s to schedule controller\n", scheduleRef);
+
+    LinkedList_add(self->schedules, sched);
+
+    Schedule_setListeningController(sched, self);
+    
+    return DATA_ACCESS_ERROR_SUCCESS;
+}
+
+void
+ScheduleController_initialize(ScheduleController self)
+{
+    // create list of known schedules 
+
+    LinkedList dataObjects = ModelNode_getChildren((ModelNode*)self->controllerLn);
+
+    LinkedList doElem = LinkedList_getNext(dataObjects);
+
+    while (doElem) {
+        DataObject* dObj = (DataObject*)LinkedList_getData(doElem);
+
+        if (scheduler_checkIfMultiObjInst(dObj->name, "Schd")) {
+            DataAttribute* schd_setSrcRef = (DataAttribute*)ModelNode_getChild((ModelNode*)dObj, "setSrcRef");
+
+            if (schd_setSrcRef) {
+                if (schd_setSrcRef->type == IEC61850_VISIBLE_STRING_129) {
+                    printf("INFO: %s.setSrcRef found\n", dObj->name);
+                
+                    if (schd_setSrcRef->mmsValue) {
+                        const char* scheduleRef = MmsValue_toString(schd_setSrcRef->mmsValue);
+                        printf("INFO:   -> schedule: %s\n", scheduleRef);
+
+                        Schedule sched = Scheduler_getScheduleByObjRef(self->scheduler, scheduleRef);
+
+                        printf("INFO:       -> schedule found\n");
+
+                        LinkedList_add(self->schedules, sched);
+
+                        Schedule_setListeningController(sched, self);
+                    }
+
+                    IedServer_handleWriteAccess(self->server, schd_setSrcRef, schd_setSrcRef_writeAccessHandler, self);
+                }
+                else {
+                    printf("ERROR: %s.setSrcRef has wrong type\n", dObj->name);
+                }
+            }
+            else {
+                printf("ERROR: %s has no attribute setSrcRef\n", dObj->name);
+            }
+        }
+
+        doElem = LinkedList_getNext(doElem);
+    }
+
+    LinkedList_destroyStatic(dataObjects);
+
+
 }
 
