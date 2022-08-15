@@ -1,92 +1,9 @@
-#include "der_scheduler.h"
-
-#include <libiec61850/hal_thread.h>
+#include "der_scheduler_internal.h"
 
 #include <string.h>
 #include <stdio.h>
 #include <ctype.h>
 #include <math.h>
-
-typedef enum {
-    SCHD_STATE_INVALID = 0,
-    SCHD_STATE_NOT_READY = 1,
-    SCHD_STATE_START_TIME_REQUIRED = 2,
-    SCHD_STATE_READY = 3,
-    SCHD_STATE_RUNNING = 4
-} ScheduleState;
-
-typedef enum {
-    SCHD_ENA_ERR_NONE = 1,
-    SCHD_ENA_ERR_MISSING_VALID_NUMENTR = 2,
-    SCHD_ENA_ERR_MISSING_VALID_SCHDINTV = 3,
-    SCHD_ENA_ERR_MISSING_VALID_SCHEDULE_VALUES = 4,
-    SCHD_ENA_ERR_UNCONSISTENT_VALUES_CDC = 5,
-    SCHD_ENA_ERR_MISSING_VALID_STRTM = 6,
-    SCHD_ENA_ERR_OTHER = 99
-} ScheduleEnablingError;
-
-typedef enum {
-    SCHD_TYPE_UNKNOWN = 0,
-    SCHD_TYPE_INS = 1,
-    SCHD_TYPE_SPS = 2,
-    SCHD_TYPE_ENS = 3,
-    SCHD_TYPE_MV = 4
-} ScheduleTargetType;
-
-struct sSchedule {
-    LogicalNode* scheduleLn;
-    ScheduleTargetType targetType;
-
-    DataObject* enaReq;
-    DataObject* dsaReq;
-    DataObject* schdSt;
-    DataObject* val;
-
-    DataObject* evTrg;
-
-    uint64_t nextStartTime;
-
-    uint64_t startTime; /* start time of current schedule execution */
-    int entryDurationInMs; /* duration of schedule entry in ms */
-    int numberOfScheduleEntries; /* number of valid schedule entries */
-    int currentEntryIdx;
-
-    IedServer server;
-    IedModel* model;
-
-    Thread thread;
-    bool alive;
-};
-
-struct sScheduleController {
-    Schedule activeSchedule;
-    LinkedList schedules;
-
-    LogicalNode* controllerLn;
-    IedServer server;
-};
-
-struct sScheduler
-{
-    IedModel* model;
-    IedServer server;
-    LinkedList scheduleController;
-    LinkedList schedules;
-};
-
-
-ScheduleController
-ScheduleController_create(LogicalNode* fsccLn, IedServer server)
-{
-    ScheduleController self = (ScheduleController)calloc(1, sizeof(struct sScheduleController));
-
-    if (self) {
-        self->controllerLn = fsccLn;
-        self->server = server;
-    }
-
-    return self;
-}
 
 static bool checkIfMultiObjInst(const char* name, const char* multiName)
 {
@@ -309,7 +226,7 @@ schedule_getNumberOfScheduleEntries(Schedule self)
         multiObjStr = "ValASG";
     }
     else if (self->targetType == SCHD_TYPE_ENS) {
-        multiObjStr = "ValING";
+        multiObjStr = "ValENG";
     }
     else if (self->targetType == SCHD_TYPE_INS) {
         multiObjStr = "ValING";
@@ -526,8 +443,23 @@ schdPrio_writeAccessHandler(DataAttribute* dataAttribute, MmsValue* value, Clien
 {
     Schedule self = (Schedule)parameter;
 
-    /* TODO send PRIO_UPDATED event to schedule controller(s) */
-    printf("SchPrio.setVal: %i\n", MmsValue_toInt32(value));
+    int prio = MmsValue_toInt32(value);
+
+    printf("SchPrio.setVal: %i\n", prio);
+
+    IedServer_updateAttributeValue(self->server, dataAttribute, value);
+
+    /* send PRIO_UPDATED event to schedule controller(s) */
+
+    LinkedList controllerElem = LinkedList_getNext(self->knownScheduleControllers);
+
+    while (controllerElem) {
+        ScheduleController controller = (ScheduleController)LinkedList_getData(controllerElem);
+
+        scheduleController_schedulePrioUpdated(controller, self, prio);
+
+        controllerElem = LinkedList_getNext(controllerElem);
+    }
 
     return DATA_ACCESS_ERROR_SUCCESS;
 }
@@ -1158,9 +1090,11 @@ Schedule_create(LogicalNode* schedLn, IedServer server, IedModel* model)
 
     if (isSchedule) {
 
+        LinkedList knownScheduleControllers = LinkedList_create();
+
         self = (Schedule)calloc(1, sizeof(struct sSchedule));
 
-        if (self) {
+        if (self && knownScheduleControllers) {
             self->scheduleLn = schedLn;
             self->server = server;
             self->model = model;
@@ -1168,6 +1102,7 @@ Schedule_create(LogicalNode* schedLn, IedServer server, IedModel* model)
             self->dsaReq = (DataObject*)dsaReq;
             self->schdSt = (DataObject*)schdSt;
             self->val = (DataObject*)scheduleValue;
+            self->knownScheduleControllers = knownScheduleControllers;
 
             self->evTrg = (DataObject*)ModelNode_getChild((ModelNode*)schedLn, "EvTrg");
 
@@ -1198,6 +1133,13 @@ Schedule_create(LogicalNode* schedLn, IedServer server, IedModel* model)
 
             Thread_start(self->thread);
         }
+        else {
+            if (knownScheduleControllers)
+                LinkedList_destroyStatic(knownScheduleControllers);
+
+            if (self)
+                Schedule_destroy(self);
+        }
     }
 
     return self;
@@ -1214,12 +1156,40 @@ Schedule_destroy(Schedule self)
     }
 }
 
+//TODO remove?
 void
 Schedule_updateParameters(Schedule self)
 {
     /* update internal parameters by the values of the data model */
 
     
+}
+
+int
+Schedule_getPrio(Schedule self)
+{
+    int prio = 0;
+
+    DataAttribute* schdPrio_setVal = (DataAttribute*)ModelNode_getChild((ModelNode*)self->scheduleLn, "SchdPrio.setVal");
+
+    if (schdPrio_setVal) {
+        if (schdPrio_setVal->mmsValue && MmsValue_getType(schdPrio_setVal->mmsValue) == MMS_INTEGER) {
+            prio = MmsValue_toInt32(schdPrio_setVal->mmsValue);
+        }
+    }
+
+    return prio;
+}
+
+bool
+Schedule_isRunning(Schedule self)
+{
+    if (schedule_getState(self) == SCHD_STATE_RUNNING) {
+        return true;
+    }
+    else {
+        return false;
+    }
 }
 
 Scheduler
