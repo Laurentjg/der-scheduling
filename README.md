@@ -22,36 +22,31 @@ Building this code requires a C toolchain and CMake installed.
 
 The C code is developed and tested with Ubuntu 20.04. The following instructions are assuming that you are using a similar Linux environment. Otherwise the required steps might differ.
 
-1. First you have to download, build, and install the latest version of [libiec61850](https://github.com/mz-automation/libiec61850) (1.5.2).
+First you have to download, build, and install the latest version of [libiec61850](https://github.com/mz-automation/libiec61850) (1.5.2).
 
 You can skip this step when libiec61850 is already installed on your PC
 
-.. code-block:: console
+        $ git clone git@github.com:mz-automation/libiec61850.git
+        $ cd libiec61850
+        $ mkdir build
+        $ cd build
+        $ cmake ..
+        $ make
+        $ sudo make install
 
-  $ git clone git@github.com:mz-automation/libiec61850.git
-  $ cd libiec61850
-  $ mkdir build
-  $ cd build
-  $ cmake ..
-  $ make
-  $ sudo make install
+Building the scheduler code
 
-2. Building the scheduler code
+        $ mkdir build
+        $ cd build
+        $ cmake ..
+        $ make
 
-.. code-block:: console
-
-  $ mkdir build
-  $ cd build
-  $ cmake ..
-  $ make
-
-3. Running the example server
+Running the example server
 
 In the build folder:
 
-.. code-block:: console
-  $ cd examples
-  $ sudo ./scheduler_example1
+        $ cd examples
+        $ sudo ./scheduler_example1
 
 The example has to be executed with root permissions in order to bind to TCP port 102.
 
