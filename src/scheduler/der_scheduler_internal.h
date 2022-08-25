@@ -61,7 +61,10 @@ struct sScheduleController {
 
     LogicalNode* controllerLn;
     IedServer server;
+    IedModel* model;
     Scheduler scheduler;
+
+    ModelNode* controlEntity; /* target object to be controlled by the schedule controller */
 };
 
 struct sScheduler
@@ -80,6 +83,12 @@ ScheduleController_destroy(ScheduleController self);
 
 void
 scheduleController_schedulePrioUpdated(ScheduleController self, Schedule sched, int newPrio);
+
+void
+scheduleController_scheduleStateUpdated(ScheduleController self, Schedule sched, ScheduleState newState);
+
+void
+scheduleController_scheduleValueUpdated(ScheduleController self, Schedule sched, MmsValue* val, uint64_t timestamp);
 
 void
 ScheduleController_initialize(ScheduleController self);

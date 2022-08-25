@@ -54,9 +54,8 @@ Scheduler_create(IedModel* model, IedServer server)
 void
 Scheduler_destroy(Scheduler self)
 {
-    if (self) {
-        //TODO release resources
-
+    if (self)
+    {
         LinkedList_destroyDeep(self->scheduleController, (LinkedListValueDeleteFunction)ScheduleController_destroy);
 
         LinkedList_destroyDeep(self->schedules, (LinkedListValueDeleteFunction)Schedule_destroy);
@@ -92,7 +91,7 @@ Scheduler_parseModel(Scheduler self)
             LogicalDevice* ld = IedModel_getDeviceByIndex(self->model, i);
 
             if (ld) {
-                printf("Found LD: %s\n", ld->name);
+                printf("INFO: Found LD: %s\n", ld->name);
 
                 LogicalNode* ln = (LogicalNode*)ld->firstChild;
 
@@ -100,25 +99,26 @@ Scheduler_parseModel(Scheduler self)
                     /* check if LN name contains "FSCC" */
 
                     if (strstr(ln->name, "FSCC")) {
+
                         /* check for other indications DO "ActSchdRef", DO "CtlEnt", DO "ValXX", DO "SchdXX" */
                         bool isScheduleController = true;
 
                         ModelNode* actSchdRef = ModelNode_getChild((ModelNode*)ln, "ActSchdRef");
 
                         if (actSchdRef == NULL) {
-                            printf("ActSchdRef not found in LN %s -> skip LN\n", ln->name);
+                            printf("ERROR: ActSchdRef not found in LN %s -> skip LN\n", ln->name);
                             isScheduleController = false;
                         }
 
                         ModelNode* ctlEnt = ModelNode_getChild((ModelNode*)ln, "CtlEnt");
 
                         if (ctlEnt == NULL) {
-                            printf("CtlEnt not found in LN %s -> skip LN\n", ln->name);
+                            printf("ERROR: CtlEnt not found in LN %s -> skip LN\n", ln->name);
                             isScheduleController = false;
                         }
 
                         if (isScheduleController) {
-                            printf("Found schedule controller: %s/%s\n", ld->name, ln->name);
+                            printf("INFO: Found schedule controller: %s/%s\n", ld->name, ln->name);
 
                             ScheduleController controller = ScheduleController_create(ln, self);
 
@@ -131,8 +131,12 @@ Scheduler_parseModel(Scheduler self)
 
                         Schedule sched = Schedule_create(ln, self->server, self->model);
 
-                        if (sched)
+                        if (sched) {
                             LinkedList_add(self->schedules, sched);
+                        }
+                        else {
+                            printf("ERROR: Invalid schedule: %s/%s -> ignored\n", ld->name, ln->name);
+                        }
                     }
 
                     ln = (LogicalNode*)ln->sibling;
