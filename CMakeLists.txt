@@ -41,3 +41,5 @@ target_link_libraries(der_scheduler -lpthread -ldl)
 set_target_properties(der_scheduler PROPERTIES SOVERSION 1)
 
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/examples)
+
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/tests)
