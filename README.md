@@ -45,6 +45,17 @@ You can skip this step when libiec61850 is already installed on your PC
   $ cmake ..
   $ make
 
+3. Running the example server
+
+In the build folder:
+
+.. code-block:: console
+  $ cd examples
+  $ sudo ./scheduler_example1
+
+The example has to be executed with root permissions in order to bind to TCP port 102.
+
+
 
 
 
