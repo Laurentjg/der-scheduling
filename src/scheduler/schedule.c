@@ -553,7 +553,8 @@ checkSyncInput(Schedule self)
     return checkResult;
 }
 
-static bool isTimeTriggered(Schedule self)
+static bool
+isTimeTriggered(Schedule self)
 {
     // check if schedule has a StrTm object
     bool hasStrTm = false;
@@ -887,7 +888,7 @@ schedule_getCurrentIdx(Schedule self, uint64_t currentTime)
 {
     int currentIdx = (currentTime - self->startTime) / self->entryDurationInMs;
 
-    if (currentIdx > self->numberOfScheduleEntries) 
+    if (currentIdx >= self->numberOfScheduleEntries) 
         currentIdx = -1;
 
     return currentIdx;
@@ -954,6 +955,25 @@ notifyControllers(Schedule self, MmsValue* val, uint64_t currentTime)
 
         controllerElem = LinkedList_getNext(controllerElem);
     }
+}
+
+MmsValue*
+Schedule_getCurrentValue(Schedule self)
+{
+    MmsValue* currentValue = NULL;
+
+    int currentIdx = schedule_getCurrentIdx(self, Hal_getTimeInMs());
+
+    if (currentIdx != -1) {
+
+        DataAttribute* valueAttr = schedule_getScheduleValueAttribute(self, currentIdx + 1);
+
+        if (valueAttr) {
+            currentValue = valueAttr->mmsValue;
+        }
+    }
+
+    return currentValue;
 }
 
 static void*

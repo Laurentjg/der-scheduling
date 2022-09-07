@@ -102,6 +102,9 @@ Schedule_getPrio(Schedule self);
 bool
 Schedule_isRunning(Schedule self);
 
+MmsValue*
+Schedule_getCurrentValue(Schedule self);
+
 void
 Schedule_destroy(Schedule self);
 

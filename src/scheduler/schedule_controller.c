@@ -272,13 +272,20 @@ scheduleController_scheduleStateUpdated(ScheduleController self, Schedule sched,
 
     if (activeSchedule) {
         if (activeSchedule != self->activeSchedule) {
+
+            printf("INFO: Active schedule changed %s -> %s\n", 
+                self->activeSchedule ? self->activeSchedule->scheduleLn->name : "", activeSchedule->scheduleLn->name);
             
             // change active schedule
             self->activeSchedule = activeSchedule;
 
+            //TODO get current value from new running schedule
+
+            MmsValue* outputValue = Schedule_getCurrentValue(activeSchedule);
+
             scheduleController_updateActSchdRef(self, self->activeSchedule);
-            scheduleController_updateCurrentValue(self, SCHD_TYPE_UNKNOWN, NULL, Hal_getTimeInMs());
-            scheduleController_updateTargetValue(self,  SCHD_TYPE_UNKNOWN, NULL, Hal_getTimeInMs());
+            scheduleController_updateCurrentValue(self, activeSchedule->targetType, outputValue, Hal_getTimeInMs());
+            scheduleController_updateTargetValue(self,  activeSchedule->targetType, outputValue, Hal_getTimeInMs());
         }
     }
     else {
