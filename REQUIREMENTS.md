@@ -85,4 +85,4 @@ Basic schedule funtionality shall be supported, as depicted below:
 
 [I02]: The Maximum Power Actuator Interface contains the current value (a double) and the source schedule priority (an integer)
 
-[I03]: The On/Off Actuator Interface contains the current value (a double) and the source schedule priority (an integer)
+[I03]: The On/Off Actuator Interface contains the current value (a double) and the source schedule priority (an integer). The mapping is 0 - off / 1 - on.
