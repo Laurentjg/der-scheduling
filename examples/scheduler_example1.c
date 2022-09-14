@@ -13,6 +13,19 @@ sigint_handler(int signalId)
     running = false;
 }
 
+static void
+scheduler_TargetValueChanged(void* parameter, const char* targetValueObjRef, MmsValue* value, Quality quality, uint64_t timestampMs)
+{
+    char mmsValueBuf[200];
+    if (value) {
+       MmsValue_printToBuffer(value, mmsValueBuf, 200);
+
+       printf("Target value changed: %s: %s\n", targetValueObjRef, mmsValueBuf);
+
+       //TODO call bash script for demo?
+    }
+}
+
 int
 main(int argc, char** argv)
 {
@@ -24,6 +37,8 @@ main(int argc, char** argv)
         Scheduler sched = Scheduler_create(model, server);
 
         Scheduler_parseModel(sched);
+
+        Scheduler_setTargetValueHandler(sched, scheduler_TargetValueChanged, server);
 
         IedServer_start(server, 102);
 

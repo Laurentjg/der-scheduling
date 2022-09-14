@@ -140,6 +140,11 @@ scheduleController_updateTargetValue(ScheduleController self, ScheduleTargetType
         if (val && valueAttr) {
             IedServer_updateAttributeValue(self->server, valueAttr, val);
         }
+
+        if (valueAttr) {
+            scheduler_targetValueChanged(self->scheduler, valueAttr, val, q, currentTime);
+        }
+        
     }
 }
 

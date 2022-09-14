@@ -73,7 +73,13 @@ struct sScheduler
     IedServer server;
     LinkedList scheduleController;
     LinkedList schedules;
+
+    Scheduler_TargetValueChanged targetValueHandler;
+    void* targetValueHandlerParameter;
 };
+
+void
+scheduler_targetValueChanged(Scheduler self, DataAttribute* targetAttr, MmsValue* value, Quality quality, uint64_t timestampMs);
 
 ScheduleController
 ScheduleController_create(LogicalNode* fsccLn, Scheduler scheduler);

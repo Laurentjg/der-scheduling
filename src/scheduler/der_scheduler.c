@@ -64,6 +64,25 @@ Scheduler_destroy(Scheduler self)
     }
 }
 
+void
+Scheduler_setTargetValueHandler(Scheduler self, Scheduler_TargetValueChanged handler, void* parameter)
+{
+    self->targetValueHandler = handler;
+    self->targetValueHandlerParameter = parameter;
+}
+
+void
+scheduler_targetValueChanged(Scheduler self, DataAttribute* targetAttr, MmsValue* value, Quality quality, uint64_t timestampMs)
+{
+    if (self->targetValueHandler) {
+        char targetValueObjRef[130];
+
+        ModelNode_getObjectReferenceEx((ModelNode*)targetAttr, targetValueObjRef, true);
+
+        self->targetValueHandler(self->targetValueHandlerParameter, targetValueObjRef, value, quality, timestampMs);
+    }
+}
+
 static void
 scheduler_initializeScheduleControllers(Scheduler self)
 {
