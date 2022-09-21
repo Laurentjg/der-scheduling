@@ -61,5 +61,4 @@ main(int argc, char** argv)
     else {
         printf("ERROR: Failed to load data model\n");
     }
-
 }
