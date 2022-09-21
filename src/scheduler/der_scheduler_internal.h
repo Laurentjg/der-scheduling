@@ -2,6 +2,10 @@
 
 #include <libiec61850/hal_thread.h>
 
+typedef struct sSchedule* Schedule;
+
+typedef struct sScheduleController* ScheduleController;
+
 typedef enum {
     SCHD_STATE_INVALID = 0,
     SCHD_STATE_NOT_READY = 1,

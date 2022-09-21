@@ -1,10 +1,6 @@
 #include <libiec61850/iec61850_server.h>
 
-typedef struct sSchedule* Schedule;
-
 typedef struct sScheduler* Scheduler;
-
-typedef struct sScheduleController* ScheduleController;
 
 /**
  * @brief Create a new Scheduler instance
@@ -56,7 +52,7 @@ Scheduler_getTargetValue(Scheduler self, const char* controllerRef, char* target
  * to EnaReq or DsaReq.
  * 
  * @param self the scheduler instance
- * @param scheduleRef the object reference of the Schedule (LDInst/LN)
+ * @param scheduleRef the object reference of the Schedule (@LDInst/LN)
  * @param enable true to enable remote control, or false to disable remote control
  */
 void
@@ -66,7 +62,7 @@ Scheduler_enableScheduleControl(Scheduler self, const char* scheduleRef, bool en
  * @brief Enable or disable a schedule
  * 
  * @param self the scheduler instance
- * @param scheduleRef the object reference of the Schedule (LDInst/LN) 
+ * @param scheduleRef the object reference of the Schedule (@LDInst/LN)
  * @param enable true to enable the schedule, or false to disable the schedule
  * 
  * @return true on success, false otherwise
@@ -84,16 +80,19 @@ typedef enum {
  * @brief Enable or disable remote client write access to specific parameters of a Schedule instance
  *  
  * @param self the scheduler instance
- * @param scheduleRef the object reference of the Schedule (LDInst/LN) 
+ * @param scheduleRef the object reference of the Schedule (@LDInst/LN)
  * @param parameter the parameter to be enabled or disabled
  * @param enable true to enable remote write access, false to disable
  */
 void
 Scheduler_enableWriteAccessToParameter(Scheduler self, const char* scheduleRef, Scheduler_ScheduleParameter parameter, bool enable);
 
+/**
+ * @brief Stop scheduler and release all resources
+ * 
+ * Do not use the reference after this call!
+ * 
+ * @param self the scheduler instance
+ */
 void
 Scheduler_destroy(Scheduler self);
-
-//TODO remove function -> move code to Scheduler_create
-void
-Scheduler_parseModel(Scheduler self);

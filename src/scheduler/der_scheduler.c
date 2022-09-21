@@ -36,6 +36,91 @@ scheduler_checkIfMultiObjInst(const char* name, const char* multiName)
     return isInstance;
 }
 
+static void
+scheduler_initializeScheduleControllers(Scheduler self)
+{
+    LinkedList schedCtrlElem = LinkedList_getNext(self->scheduleController);
+
+    while (schedCtrlElem) {
+
+        ScheduleController controller = (ScheduleController)LinkedList_getData(schedCtrlElem);
+
+        ScheduleController_initialize(controller);
+
+        schedCtrlElem = LinkedList_getNext(schedCtrlElem);
+    }
+}
+
+static void
+scheduler_parseModel(Scheduler self)
+{
+    if (self->model) {
+        /* search data model for FSCC instances */
+
+        int i = 0;
+
+        for (i = 0; i < IedModel_getLogicalDeviceCount(self->model); i++) {
+            LogicalDevice* ld = IedModel_getDeviceByIndex(self->model, i);
+
+            if (ld) {
+                printf("INFO: Found LD: %s\n", ld->name);
+
+                LogicalNode* ln = (LogicalNode*)ld->firstChild;
+
+                while (ln) {
+                    /* check if LN name contains "FSCC" */
+
+                    if (strstr(ln->name, "FSCC")) {
+
+                        /* check for other indications DO "ActSchdRef", DO "CtlEnt", DO "ValXX", DO "SchdXX" */
+                        bool isScheduleController = true;
+
+                        ModelNode* actSchdRef = ModelNode_getChild((ModelNode*)ln, "ActSchdRef");
+
+                        if (actSchdRef == NULL) {
+                            printf("ERROR: ActSchdRef not found in LN %s -> skip LN\n", ln->name);
+                            isScheduleController = false;
+                        }
+
+                        ModelNode* ctlEnt = ModelNode_getChild((ModelNode*)ln, "CtlEnt");
+
+                        if (ctlEnt == NULL) {
+                            printf("ERROR: CtlEnt not found in LN %s -> skip LN\n", ln->name);
+                            isScheduleController = false;
+                        }
+
+                        if (isScheduleController) {
+                            printf("INFO: Found schedule controller: %s/%s\n", ld->name, ln->name);
+
+                            ScheduleController controller = ScheduleController_create(ln, self);
+
+                            if (controller)
+                                LinkedList_add(self->scheduleController, controller);
+                        }
+                    }
+
+                    if (strstr(ln->name, "FSCH")) {
+
+                        Schedule sched = Schedule_create(ln, self->server, self->model);
+
+                        if (sched) {
+                            LinkedList_add(self->schedules, sched);
+                        }
+                        else {
+                            printf("ERROR: Invalid schedule: %s/%s -> ignored\n", ld->name, ln->name);
+                        }
+                    }
+
+                    ln = (LogicalNode*)ln->sibling;
+                }
+
+            }
+        }
+
+        scheduler_initializeScheduleControllers(self);
+    }
+}
+
 Scheduler
 Scheduler_create(IedModel* model, IedServer server)
 {  
@@ -46,6 +131,8 @@ Scheduler_create(IedModel* model, IedServer server)
         self->server = server;
         self->scheduleController = LinkedList_create();
         self->schedules = LinkedList_create();
+
+        scheduler_parseModel(self);
     }
 
     return self;
@@ -138,91 +225,6 @@ scheduler_targetValueChanged(Scheduler self, DataAttribute* targetAttr, MmsValue
         ModelNode_getObjectReferenceEx((ModelNode*)targetAttr, targetValueObjRef, true);
 
         self->targetValueHandler(self->targetValueHandlerParameter, targetValueObjRef, value, quality, timestampMs);
-    }
-}
-
-static void
-scheduler_initializeScheduleControllers(Scheduler self)
-{
-    LinkedList schedCtrlElem = LinkedList_getNext(self->scheduleController);
-
-    while (schedCtrlElem) {
-
-        ScheduleController controller = (ScheduleController)LinkedList_getData(schedCtrlElem);
-
-        ScheduleController_initialize(controller);
-
-        schedCtrlElem = LinkedList_getNext(schedCtrlElem);
-    }
-}
-
-void
-Scheduler_parseModel(Scheduler self)
-{
-    if (self->model) {
-        /* search data model for FSCC instances */
-
-        int i = 0;
-
-        for (i = 0; i < IedModel_getLogicalDeviceCount(self->model); i++) {
-            LogicalDevice* ld = IedModel_getDeviceByIndex(self->model, i);
-
-            if (ld) {
-                printf("INFO: Found LD: %s\n", ld->name);
-
-                LogicalNode* ln = (LogicalNode*)ld->firstChild;
-
-                while (ln) {
-                    /* check if LN name contains "FSCC" */
-
-                    if (strstr(ln->name, "FSCC")) {
-
-                        /* check for other indications DO "ActSchdRef", DO "CtlEnt", DO "ValXX", DO "SchdXX" */
-                        bool isScheduleController = true;
-
-                        ModelNode* actSchdRef = ModelNode_getChild((ModelNode*)ln, "ActSchdRef");
-
-                        if (actSchdRef == NULL) {
-                            printf("ERROR: ActSchdRef not found in LN %s -> skip LN\n", ln->name);
-                            isScheduleController = false;
-                        }
-
-                        ModelNode* ctlEnt = ModelNode_getChild((ModelNode*)ln, "CtlEnt");
-
-                        if (ctlEnt == NULL) {
-                            printf("ERROR: CtlEnt not found in LN %s -> skip LN\n", ln->name);
-                            isScheduleController = false;
-                        }
-
-                        if (isScheduleController) {
-                            printf("INFO: Found schedule controller: %s/%s\n", ld->name, ln->name);
-
-                            ScheduleController controller = ScheduleController_create(ln, self);
-
-                            if (controller)
-                                LinkedList_add(self->scheduleController, controller);
-                        }
-                    }
-
-                    if (strstr(ln->name, "FSCH")) {
-
-                        Schedule sched = Schedule_create(ln, self->server, self->model);
-
-                        if (sched) {
-                            LinkedList_add(self->schedules, sched);
-                        }
-                        else {
-                            printf("ERROR: Invalid schedule: %s/%s -> ignored\n", ld->name, ln->name);
-                        }
-                    }
-
-                    ln = (LogicalNode*)ln->sibling;
-                }
-
-            }
-        }
-
-        scheduler_initializeScheduleControllers(self);
     }
 }
 
