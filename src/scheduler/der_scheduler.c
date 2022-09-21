@@ -65,6 +65,64 @@ Scheduler_destroy(Scheduler self)
 }
 
 void
+Scheduler_enableScheduleControl(Scheduler self, const char* scheduleRef, bool enable)
+{
+    Schedule schedule = Scheduler_getScheduleByObjRef(self, scheduleRef);
+
+    if (schedule) {
+        Schedule_enableScheduleControl(schedule, enable);
+    }
+    else {
+        printf("WARN: Schedule %s not found\n", scheduleRef);
+    }
+}
+
+bool
+Scheduler_enableSchedule(Scheduler self, const char* scheduleRef, bool enable)
+{
+    Schedule schedule = Scheduler_getScheduleByObjRef(self, scheduleRef);
+
+    if (schedule) {
+        return Schedule_enableSchedule(schedule, enable);
+    }
+    else {
+        printf("WARN: Schedule %s not found\n", scheduleRef);
+
+        return false;
+    }
+}
+
+void
+Scheduler_enableWriteAccessToParameter(Scheduler self, const char* scheduleRef, Scheduler_ScheduleParameter parameter, bool enable)
+{
+    Schedule schedule = Scheduler_getScheduleByObjRef(self, scheduleRef);
+
+    if (schedule) {
+        switch (parameter)
+        {
+        case SCHED_PARAM_SCHD_PRIO:
+            Schedule_enableWriteAccessToSchdPrio(schedule, enable);
+            break;
+
+        case SCHED_PARAM_STR_TM:
+            Schedule_enableWriteAccessToStrTm(schedule, enable);
+            break;
+
+        case SCHED_PARAM_SCHD_REUSE:
+            Schedule_enableWriteAccessToSchdReuse(schedule, enable);
+            break;
+        
+        default:
+            printf("WARN: Unknown parameter %i\n", parameter);
+            break;
+        }
+    }
+    else {
+        printf("WARN: Schedule %s not found\n", scheduleRef);
+    }
+}
+
+void
 Scheduler_setTargetValueHandler(Scheduler self, Scheduler_TargetValueChanged handler, void* parameter)
 {
     self->targetValueHandler = handler;

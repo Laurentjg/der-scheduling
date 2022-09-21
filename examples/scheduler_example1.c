@@ -40,6 +40,29 @@ main(int argc, char** argv)
 
         Scheduler_setTargetValueHandler(sched, scheduler_TargetValueChanged, server);
 
+        /* configure fallback schedules */
+
+        /* don't allow remote control of fallback schedules */
+        Scheduler_enableScheduleControl(sched, "@Control/ActPow_Res_FSCH01", false);
+        Scheduler_enableScheduleControl(sched, "@Control/MaxPow_Res_FSCH01", false);
+        Scheduler_enableScheduleControl(sched, "@Control/OnOff_Res_FSCH01", false);
+
+        /* block remote change of schedule parameters */
+        Scheduler_enableWriteAccessToParameter(sched, "@Control/ActPow_Res_FSCH01", SCHED_PARAM_STR_TM, false);
+        Scheduler_enableWriteAccessToParameter(sched, "@Control/ActPow_Res_FSCH01", SCHED_PARAM_SCHD_PRIO, false);
+
+        Scheduler_enableWriteAccessToParameter(sched, "@Control/MaxPow_Res_FSCH01", SCHED_PARAM_STR_TM, false);
+        Scheduler_enableWriteAccessToParameter(sched, "@Control/MaxPow_Res_FSCH01", SCHED_PARAM_SCHD_PRIO, false);
+
+        Scheduler_enableWriteAccessToParameter(sched, "@Control/OnOff_Res_FSCH01", SCHED_PARAM_STR_TM, false);
+        Scheduler_enableWriteAccessToParameter(sched, "@Control/OnOff_Res_FSCH01", SCHED_PARAM_SCHD_PRIO, false);
+
+
+        /* enable all fallback schedules */
+        Scheduler_enableSchedule(sched, "@Control/ActPow_Res_FSCH01", true);
+        Scheduler_enableSchedule(sched, "@Control/MaxPow_Res_FSCH01", true);
+        Scheduler_enableSchedule(sched, "@Control/OnOff_Res_FSCH01", true);
+
         IedServer_start(server, 102);
 
         if (IedServer_isRunning(server)) {

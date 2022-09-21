@@ -52,6 +52,11 @@ struct sSchedule {
     Thread thread;
     bool alive;
 
+    bool allowRemoteControl; /* allow remote control of EnaReq/DsaReq */
+    bool allowWriteToSchdPrio;
+    bool allowWriteToStrTm;
+    bool allowWriteToSchdReuse;
+
     LinkedList knownScheduleControllers; /* list of ScheduleControllers to inform on state/value change events */
 };
 
@@ -122,3 +127,18 @@ Scheduler_getScheduleByObjRef(Scheduler self, const char* objRef);
 
 void
 Schedule_setListeningController(Schedule self, ScheduleController controller);
+
+void
+Schedule_enableScheduleControl(Schedule self, bool enable);
+
+bool
+Schedule_enableSchedule(Schedule self, bool enable);
+
+void
+Schedule_enableWriteAccessToSchdPrio(Schedule self, bool enable);
+
+void
+Schedule_enableWriteAccessToStrTm(Schedule self, bool enable);
+
+void
+Schedule_enableWriteAccessToSchdReuse(Schedule self, bool enable);

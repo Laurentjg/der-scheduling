@@ -444,30 +444,36 @@ strTm_writeAccessHandler(DataAttribute* dataAttribute, MmsValue* value, ClientCo
 {
     Schedule self = (Schedule)parameter;
 
-    uint64_t newStrTm = MmsValue_getUtcTimeInMs(value);
+    if (self->allowWriteToStrTm)
+    {
+        uint64_t newStrTm = MmsValue_getUtcTimeInMs(value);
 
-    char objRefBuf[130];
+        char objRefBuf[130];
 
-    ModelNode_getObjectReference((ModelNode*) dataAttribute, objRefBuf);
+        ModelNode_getObjectReference((ModelNode*) dataAttribute, objRefBuf);
 
-    // check if the time is valid (is in the future)
-    if (newStrTm > Hal_getTimeInMs()) {
-        //TODO check if the schedule is in the correct state?
+        // check if the time is valid (is in the future)
+        if (newStrTm > Hal_getTimeInMs()) {
+            //TODO check if the schedule is in the correct state?
 
-        if (schedule_getState(self) == SCHD_STATE_READY) {
-            //self->nextStartTime = schedule_getNextStartTime(self);
+            if (schedule_getState(self) == SCHD_STATE_READY) {
+                //self->nextStartTime = schedule_getNextStartTime(self);
 
-            //schedule_updateNxtStrTm(self, newStrTm);
+                //schedule_updateNxtStrTm(self, newStrTm);
+            }
+
+            printf("INFO: Write access to %s -> value accepted\n", objRefBuf);
+
+            return DATA_ACCESS_ERROR_SUCCESS;
         }
+        else {
+            printf("WARN: Write access to %s -> invalid value\n", objRefBuf);
 
-        printf("INFO: Write access to %s -> value accepted\n", objRefBuf);
-
-        return DATA_ACCESS_ERROR_SUCCESS;
+            return DATA_ACCESS_ERROR_OBJECT_VALUE_INVALID;
+        }
     }
     else {
-        printf("WARN: Write access to %s -> invalid value\n", objRefBuf);
-
-        return DATA_ACCESS_ERROR_OBJECT_VALUE_INVALID;
+        return DATA_ACCESS_ERROR_OBJECT_ACCESS_DENIED;
     }
 }
 
@@ -476,27 +482,45 @@ schdPrio_writeAccessHandler(DataAttribute* dataAttribute, MmsValue* value, Clien
 {
     Schedule self = (Schedule)parameter;
 
-    int prio = MmsValue_toInt32(value);
+    if (self->allowWriteToSchdPrio) {
+        int prio = MmsValue_toInt32(value);
 
-    printf("SchPrio.setVal: %i\n", prio);
+        printf("SchPrio.setVal: %i\n", prio);
 
-    IedServer_updateAttributeValue(self->server, dataAttribute, value);
+        IedServer_updateAttributeValue(self->server, dataAttribute, value);
 
-    /* send PRIO_UPDATED event to schedule controller(s) */
+        /* send PRIO_UPDATED event to schedule controller(s) */
 
-    LinkedList controllerElem = LinkedList_getNext(self->knownScheduleControllers);
+        LinkedList controllerElem = LinkedList_getNext(self->knownScheduleControllers);
 
-    while (controllerElem) {
-        ScheduleController controller = (ScheduleController)LinkedList_getData(controllerElem);
+        while (controllerElem) {
+            ScheduleController controller = (ScheduleController)LinkedList_getData(controllerElem);
 
-        scheduleController_schedulePrioUpdated(controller, self, prio);
+            scheduleController_schedulePrioUpdated(controller, self, prio);
 
-        controllerElem = LinkedList_getNext(controllerElem);
+            controllerElem = LinkedList_getNext(controllerElem);
+        }
+
+        printf("--> return OK\n");
+
+        return DATA_ACCESS_ERROR_SUCCESS;
     }
+    else {
+        return DATA_ACCESS_ERROR_OBJECT_ACCESS_DENIED;
+    }
+}
 
-    printf("--> return OK\n");
+static MmsDataAccessError
+schdReuse_writeAccessHandler(DataAttribute* dataAttribute, MmsValue* value, ClientConnection connection, void* parameter)
+{
+    Schedule self = (Schedule)parameter;
 
-    return DATA_ACCESS_ERROR_SUCCESS;
+    if (self->allowWriteToSchdReuse) {
+        return DATA_ACCESS_ERROR_SUCCESS;
+    }
+    else {
+        return DATA_ACCESS_ERROR_OBJECT_ACCESS_DENIED;
+    }
 }
 
 static bool
@@ -627,7 +651,8 @@ getStartTime(DataObject* strTm)
     return strTmVal;
 }
 
-static bool checkForValidStartTimes(Schedule self)
+static bool
+checkForValidStartTimes(Schedule self)
 {
     bool hasValidStartTimes = false;
     //TODO check data objects for StrTm objects
@@ -849,6 +874,51 @@ disableSchedule(Schedule self)
     schedule_udpateState(self, newState);
 }
 
+static CheckHandlerResult
+schedule_performCheckHandler(ControlAction action, void* parameter, MmsValue* ctlVal, bool test, bool interlockCheck)
+{
+    CheckHandlerResult result = CONTROL_OBJECT_UNDEFINED;
+
+    Schedule self = (Schedule)parameter; 
+
+    DataObject* ctrlObj = ControlAction_getControlObject(action);
+
+    char scheduleRef[130];
+    ModelNode_getObjectReference((ModelNode*)self->scheduleLn, scheduleRef);
+
+    if (ctrlObj == self->enaReq) {
+        if ((test == false) && (MmsValue_getBoolean(ctlVal) == true)) {
+            if (self->allowRemoteControl) {
+                //TODO perform check if schedule is valid
+                result = CONTROL_ACCEPTED;
+            }
+            else {
+                result = CONTROL_OBJECT_ACCESS_DENIED;
+            }
+        }
+        else {
+            result = CONTROL_ACCEPTED;
+        }
+    }
+    else if (ctrlObj == self->dsaReq) {
+        if ((test == false) && (MmsValue_getBoolean(ctlVal) == true)) {
+            if (self->allowRemoteControl) {
+                result = CONTROL_ACCEPTED;
+            }
+            else {
+                result = CONTROL_OBJECT_ACCESS_DENIED;
+            }
+        }
+        else {
+            result = CONTROL_ACCEPTED;
+        }
+    }
+
+    printf("Controlhandler (%s) -> %i\n", scheduleRef, result);
+
+    return result;
+}
+
 static ControlHandlerResult 
 schedule_controlHandler(ControlAction action, void* parameter, MmsValue* ctlVal, bool test)
 {
@@ -869,8 +939,6 @@ schedule_controlHandler(ControlAction action, void* parameter, MmsValue* ctlVal,
                 //TODO figure out how a negative answer can be sent?
                 printf("WARN: Cannot enable schedule %s\n", scheduleRef);
             }
-
-
         }
     }
     else if (ctrlObj == self->dsaReq) {
@@ -881,6 +949,8 @@ schedule_controlHandler(ControlAction action, void* parameter, MmsValue* ctlVal,
             printf("INFO: Disabled schedule %s\n", scheduleRef);
         }
     }
+
+    return CONTROL_RESULT_OK;
 }
 
 static int
@@ -1172,6 +1242,8 @@ Schedule_create(LogicalNode* schedLn, IedServer server, IedModel* model)
         targetType = SCHD_TYPE_ENS;
     }
 
+    ModelNode* schdResue_setVal = ModelNode_getChild((ModelNode*)schedLn, "SchdReuse.setVal");
+
     if (targetType == SCHD_TYPE_UNKNOWN) {
         printf("ERROR: Found schedule %s/%s but with unknown target type!\n", schedLn->parent->name, schedLn->name);
     }
@@ -1210,7 +1282,14 @@ Schedule_create(LogicalNode* schedLn, IedServer server, IedModel* model)
 
             IedServer_handleWriteAccess(self->server, schdPrio_setVal, schdPrio_writeAccessHandler, self);
 
+            if (schdResue_setVal) {
+                IedServer_handleWriteAccess(self->server, (DataAttribute*)schdResue_setVal, schdReuse_writeAccessHandler, self);
+            }
+
             schedule_installWriteAccessHandlersForStrTm(self);
+
+            IedServer_setPerformCheckHandler(self->server, self->dsaReq, schedule_performCheckHandler, self);
+            IedServer_setPerformCheckHandler(self->server, self->enaReq, schedule_performCheckHandler, self);
 
             IedServer_setControlHandler(self->server, self->dsaReq, schedule_controlHandler, self);
             IedServer_setControlHandler(self->server, self->enaReq, schedule_controlHandler, self);
@@ -1222,6 +1301,11 @@ Schedule_create(LogicalNode* schedLn, IedServer server, IedModel* model)
             self->thread = Thread_create(schedule_thread, self, false);
 
             self->alive = true;
+
+            self->allowRemoteControl = true;
+            self->allowWriteToSchdPrio = true;
+            self->allowWriteToStrTm = true;
+            self->allowWriteToSchdReuse = true;
 
             Thread_start(self->thread);
         }
@@ -1273,4 +1357,43 @@ Schedule_isRunning(Schedule self)
     else {
         return false;
     }
+}
+
+void
+Schedule_enableScheduleControl(Schedule self, bool enable)
+{
+    self->allowRemoteControl = enable;
+}
+
+bool
+Schedule_enableSchedule(Schedule self, bool enable)
+{
+    if (enable) {
+        return enabledSchedule(self);
+    }
+    else {
+        if (schedule_getState(self) != SCHD_STATE_NOT_READY) {
+            disableSchedule(self);
+        }
+
+        return true;
+    }
+}
+
+void
+Schedule_enableWriteAccessToSchdPrio(Schedule self, bool enable)
+{
+    self->allowWriteToSchdPrio = enable;
+}
+
+void
+Schedule_enableWriteAccessToStrTm(Schedule self, bool enable)
+{
+    self->allowWriteToStrTm = enable;
+}
+
+void
+Schedule_enableWriteAccessToSchdReuse(Schedule self, bool enable)
+{
+    self->allowWriteToSchdReuse = enable;
 }
