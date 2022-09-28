@@ -11,6 +11,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.openmuc.fnn.steuerbox.models.AllianderDER;
 import org.openmuc.fnn.steuerbox.models.Requirements;
 import org.openmuc.fnn.steuerbox.models.ScheduleConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -27,11 +29,28 @@ import java.util.stream.Stream;
  */
 public abstract class AllianderBaseTest {
 
+    private static final Logger logger = LoggerFactory.getLogger(ScheduleNodeTests.class);
+
     protected static AllianderDER dut;
 
     @BeforeAll
     public static void init() throws ServiceError, IOException {
         dut = AllianderDER.getWithDefaultSettings();
+    }
+
+    @BeforeAll
+    public static void disableAllRunningSchedules() {
+        getScheduleTypes().forEach(scheduleType -> {
+            scheduleType.getAllScheduleNames().forEach(schedule -> {
+                try {
+                    dut.disableSchedules(schedule);
+                } catch (Exception e) {
+                    Assertions.fail("error, could not disable schedule " + schedule);
+                    logger.error("error, could not disable schedule " + schedule, e);
+                }
+            });
+        });
+        logger.debug("Disabled all schedules during init");
     }
 
     protected static Stream<ScheduleConstants> getScheduleTypes() {
@@ -78,6 +97,9 @@ public abstract class AllianderBaseTest {
 
         for (Map.Entry<String, Fc> entry : atMostOne.entrySet()) {
             ModelNode scheduleNode = dut.getNode(parentNode);
+            if (scheduleNode == null) {
+                Assertions.fail("Unable to find node " + parentNode);
+            }
             List<String> occurencesThatContainKeyInName = scheduleNode.getChildren().stream()//
                     .filter(childNode -> childNode.getName().contains(entry.getKey()))//
                     .map(ModelNode::getReference)//

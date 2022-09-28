@@ -1,13 +1,10 @@
 package org.openmuc.fnn.steuerbox;
 
-import com.beanit.iec61850bean.Fc;
 import com.beanit.iec61850bean.ServiceError;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.openmuc.fnn.steuerbox.models.Requirements;
 import org.openmuc.fnn.steuerbox.models.ScheduleConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,102 +16,85 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 
-// TODO: link these to requirements, then move it into SchedulingTest
-public class ConformanceTest extends AllianderBaseTest {
+/**
+ * Holds tests related to 61850 schedule execution
+ */
+public class ScheduleExecutionTest extends AllianderBaseTest {
 
-    private static final Logger log = LoggerFactory.getLogger(ConformanceTest.class);
-
-    @BeforeEach
-    public void makeSureTimeSet() {
-        Assertions.assertTrue(dut.isTimeSet());
-        log.warn("MAKE SURE THAT THE DATE/TIME IS SET PROPERLY; OTHERWISE THESE TESTS WILL NOT WORK");
-    }
-
-    @BeforeAll
-    public static void disableAllRunningSchedules() {
-        getScheduleTypes().forEach(scheduleType -> {
-            scheduleType.getAllScheduleNames().forEach(schedule -> {
-                try {
-                    dut.disableSchedules(schedule);
-                } catch (Exception e) {
-                    Assertions.fail("error, could not disable schedule " + schedule);
-                    log.error("error, could not disable schedule " + schedule, e);
-                }
-            });
-        });
-        log.debug("Disabled all schedules during init");
-    }
+    private static final Logger log = LoggerFactory.getLogger(ScheduleExecutionTest.class);
 
     /**
-     * {@ link Requirements#LN02a}
+     * based on 6185-90-10 {@link Requirements#E02} {@link Requirements#S02} {@link Requirements#S05a}{@link
+     * Requirements#S05b}{@link Requirements#S05c} {@link Requirements#E01}
+     * <p>
+     * TODO add section as refernce
+     * <p>
+     * TODO do the same for all three kinds of schedules
      */
-    @ParameterizedTest
+    @ParameterizedTest(name = "test_priorities running {0}")
     @MethodSource("getScheduleTypes")
-    void activeControllerIsUpdated(ScheduleConstants scheduleConstants)
-            throws ServiceError, IOException, InterruptedException {
-        //initial state: no schedule active -> reserve schedule is working
-        //test, that ActSchdRef contains a reference of the reserve schedule
-
-        Assertions.assertEquals(scheduleConstants.getReserveSchedule(), scheduleConstants.getController(),
-                "Expecting no schedules to run in initial state");
-
-        String schedule = scheduleConstants.getScheduleName(1);
-        //write and activate a schedule with a higher priority than the reserve schedule
-        Instant scheduleStart = Instant.now().plus(Duration.ofSeconds(2));
-        dut.writeAndEnableSchedule(Arrays.asList(70), Duration.ofSeconds(2), schedule, scheduleStart, 100);
-
-        // waiting shortly, why so long??
-        Thread.sleep(6000);
-
-        //test, that ActSchdRef contains a reference of the active schedule
-        Assertions.assertEquals(schedule, "FNN_STEUERBOX" + dut.readActiveSchedule(scheduleConstants.getController()));
-
-        // wait until the active schedule finished service
-        Thread.sleep(5000);
-
-        //make sure the reserve schedule is active again
-        Assertions.assertEquals(scheduleConstants.getReserveSchedule(),
-                dut.readActiveSchedule(scheduleConstants.getController()),
-                "Did not return to system reserve schedule after execution time");
-    }
-
-    /**
-     * {@ link Requirements#LN02a}
-     */
-    @ParameterizedTest
-    @MethodSource("getScheduleTypes")
-    void activeControllerIsUpdatedWithScheduleOfHighestPrio(ScheduleConstants scheduleConstants)
+    public void test_priorities(ScheduleConstants scheduleConstants)
             throws ServiceError, IOException, InterruptedException {
 
-        Assertions.assertEquals(scheduleConstants.getReserveSchedule(),
-                dut.readActiveSchedule(scheduleConstants.getController()),
-                "Expecting no schedules to run in initial state");
-        ;
+        final Instant testExecutionStart = Instant.now();
+        final Instant schedulesStart = testExecutionStart.plus(Duration.ofSeconds(30));
 
-        Instant start = Instant.now().plus(Duration.ofMillis(500));
-        // schedule 1 with low prio
-        dut.writeAndEnableSchedule(Arrays.asList(100), Duration.ofSeconds(1), scheduleConstants.getScheduleName(1),
-                start, 20);
+        //schedule 1:
+        dut.writeAndEnableSchedule(Arrays.asList(10, 30, 70, 100, 100, 100), Duration.ofSeconds(2),
+                scheduleConstants.getScheduleName(1), schedulesStart.plus(Duration.ofSeconds(2)), 25);
 
-        // schedule 2 starts a bit after schedule 1 but with higher prio
-        dut.writeAndEnableSchedule(Arrays.asList(10), Duration.ofSeconds(1), scheduleConstants.getScheduleName(2),
-                start.plus(Duration.ofSeconds(1)), 200);
+        // schedule 2:
+        dut.writeAndEnableSchedule(Arrays.asList(11, 31, 71, 99, 99, 99), Duration.ofSeconds(2),
+                scheduleConstants.getScheduleName(2), schedulesStart.plus(Duration.ofSeconds(10)), 40);
 
-        Thread.sleep(Duration.between(start, Instant.now()).toMillis() + 200);
+        // schedule 3:
+        dut.writeAndEnableSchedule(Arrays.asList(12, 32, 72, 98, 98), Duration.ofSeconds(2),
+                scheduleConstants.getScheduleName(3), schedulesStart.plus(Duration.ofSeconds(18)), 60);
 
-        Assertions.assertEquals(dut.readActiveSchedule(scheduleConstants.getController()),
-                scheduleConstants.getScheduleName(2));
+        //schedule 4, ends after 44s:
+        dut.writeAndEnableSchedule(Arrays.asList(13, 33, 73, 97, 97, 97, 97, 97, 97, 97), Duration.ofSeconds(2),
+                scheduleConstants.getScheduleName(4), schedulesStart.plus(Duration.ofSeconds(26)), 60);
 
-        Thread.sleep(1000); // FIXME: is this really necessary?
+        //schedule 5, ends after 42s
+        dut.writeAndEnableSchedule(Arrays.asList(70, 70, 70, 70, 70), Duration.ofSeconds(2),
+                scheduleConstants.getScheduleName(5), schedulesStart.plus(Duration.ofSeconds(34)), 100);
+
+        //schedule 6,
+        dut.writeAndEnableSchedule(Arrays.asList(90), Duration.ofSeconds(2), scheduleConstants.getScheduleName(6),
+                schedulesStart.plus(Duration.ofSeconds(36)), 120);
+
+        //schedule 7,
+
+        dut.writeAndEnableSchedule(Arrays.asList(90), Duration.ofSeconds(2), scheduleConstants.getScheduleName(7),
+                schedulesStart.plus(Duration.ofSeconds(40)), 120);
+
+        //schedule 8:
+
+        dut.writeAndEnableSchedule(Arrays.asList(10), Duration.ofSeconds(2), scheduleConstants.getScheduleName(8),
+                schedulesStart.plus(Duration.ofSeconds(44)), 80);
+
+        //schedule 9
+        dut.writeAndEnableSchedule(Arrays.asList(80), Duration.ofSeconds(2), scheduleConstants.getScheduleName(9),
+                schedulesStart.plus(Duration.ofSeconds(46)), 20);
+
+        //schedule 10
+        dut.writeAndEnableSchedule(Arrays.asList(100), Duration.ofSeconds(2), scheduleConstants.getScheduleName(10),
+                schedulesStart.plus(Duration.ofSeconds(48)), 10);
+
+        List<Float> expectedValues = Arrays.asList(0f, 10f, 30f, 70f, 100f, 11f, 31f, 71f, 99f, 12f, 32f, 72f, 98f, 13f,
+                33f, 73f, 97f, 70f, 90f, 70f, 90f, 70f, 10f, 80f, 100f, 0f);
+
+        List<Float> actualValues = dut.monitor(schedulesStart, Duration.ofSeconds(48), Duration.ofSeconds(2),
+                scheduleConstants);
+        log.info("expected values {}", expectedValues);
+        log.info("observed values {}", actualValues);
+
+        assertValuesMatch(expectedValues, actualValues, 0.01);
     }
 
-    @ParameterizedTest
+    @ParameterizedTest(name = "testSchedulePriosWithTwoSchedules running {0}")
     @MethodSource("getScheduleTypes")
     public void testSchedulePriosWithTwoSchedules(ScheduleConstants scheduleConstants)
             throws ServiceError, IOException, InterruptedException {
@@ -164,7 +144,7 @@ public class ConformanceTest extends AllianderBaseTest {
     }
 
     @Disabled
-    @ParameterizedTest
+    @ParameterizedTest(name = "testRisingPriorities running {0}")
     @MethodSource("getScheduleTypes")
     public void testRisingPriorities(ScheduleConstants scheduleConstants)
             throws ServiceError, IOException, InterruptedException, ParserConfigurationException,
@@ -209,8 +189,7 @@ public class ConformanceTest extends AllianderBaseTest {
         }
     }
 
-    @Disabled
-    @ParameterizedTest
+    @ParameterizedTest(name = "testSamePrios running {0}")
     @MethodSource("getScheduleTypes")
     public void testSamePrios(ScheduleConstants scheduleConstants)
             throws ServiceError, IOException, InterruptedException {
@@ -246,8 +225,7 @@ public class ConformanceTest extends AllianderBaseTest {
         }
     }
 
-    @Disabled
-    @ParameterizedTest
+    @ParameterizedTest(name = "samePriorityAndStart running {0}")
     @MethodSource("getScheduleTypes")
     public void samePriorityAndStart(ScheduleConstants scheduleConstants)
             throws ServiceError, IOException, InterruptedException {
@@ -274,76 +252,8 @@ public class ConformanceTest extends AllianderBaseTest {
         }
 
         // TODO: use some actual asserts after expected behaviour has been clarified with MZ
-    }
 
-    /**
-     * Test if the scheduler has the required nodes with correct types as defined in IEC 61850-90-10:2017, table 6 (page
-     * 25)
-     **/
-    @ParameterizedTest
-    @MethodSource("getScheduleTypes")
-    void scheduleControllerNodeHasRequiredNodes(ScheduleConstants scheduleConstants) {
-
-        // relevant part of the table is the "non-derived-statistics" (nds) column
-
-        Map<String, Fc> optional = new HashMap<>();
-        Map<String, Fc> atMostOne = new HashMap<>();
-        Map<String, Fc> mandatory = new HashMap<>();
-        Map<String, Fc> mMulti = new HashMap<>();
-        Map<String, Fc> oMulti = new HashMap<>();
-
-        /**
-         * Descriptions (DC)
-         */
-        optional.put("NamPlt", Fc.DC);
-
-        /**
-         * Status Information (ST)
-         */
-        mandatory.put("ActSchdRef", Fc.ST);
-        atMostOne.put("ValINS", Fc.ST);
-        atMostOne.put("ValSPS", Fc.ST);
-        atMostOne.put("ValENS", Fc.ST);
-        mandatory.put("Beh", Fc.ST);
-        optional.put("Health", Fc.ST);
-        optional.put("Mir", Fc.ST);
-        /**
-         * Measured and metered values (MX)
-         */
-        atMostOne.put("ValMV", Fc.MX);
-        /**
-         * Controls
-         */
-        optional.put("Mod", Fc.CO);
-        /**
-         * Settings (SP)
-         */
-        mandatory.put("CtlEnt", Fc.SP);
-        for (int n = 1; n <= 10; n++) {
-            // n=001..010 is only valid for Alliander tests
-            String numberAsStringFilledUpWithZeros = String.format("%03d", n);
-            mMulti.put("Schd" + numberAsStringFilledUpWithZeros, Fc.SP);
-        }
-        oMulti.put("InRef", Fc.SP);
-
-        /***
-         * Replace this by usages of test
-         */
-
-        String controllerNode = scheduleConstants.getController();
-        Collection<String> violations = new LinkedList<>();
-        violations.addAll(testOptionalNodes(optional, controllerNode));
-        violations.addAll(testAtMostOnceNodes(atMostOne, controllerNode));
-        violations.addAll(testMandatoryNodes(mandatory, controllerNode));
-        violations.addAll(testMMulti(mMulti, controllerNode));
-        violations.addAll(testOMulti(oMulti, controllerNode));
-
-        String delimiter = "\n - ";
-        String violationsList = delimiter + String.join(delimiter, violations);
-
-        Assertions.assertTrue(violations.isEmpty(),
-                "Found violations of node requirements for schedule controller " + controllerNode + ": "
-                        + violationsList + "\n");
+        org.junit.jupiter.api.Assertions.fail("not implemented: feedback from MZ required");
     }
 
 }
