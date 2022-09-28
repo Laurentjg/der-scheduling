@@ -233,6 +233,7 @@ public class IEC61850Utility implements Closeable {
             try {
                 if (counter.getAndDecrement() > 0) {
                     float value = readAnalogOutFromGGIO(constants.getControlledGGIO());
+                    log.debug("Read value {} from {}", value, constants.getControlledGGIO());
                     monitoredValues.add(value);
                 }
                 else {

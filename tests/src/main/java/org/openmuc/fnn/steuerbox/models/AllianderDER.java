@@ -16,7 +16,7 @@ public class AllianderDER extends IEC61850Utility {
     }
 
     public final ScheduleConstants powerSchedules = ScheduleConstants.fromScheduleNames(
-            "DER_Scheduler_Control/ActPow_GGIO",//
+            "DER_Scheduler_Control/ActPow_GGIO1",//
             "DER_Scheduler_Control/ActPow_FSCC",//
             "DER_Scheduler_Control/ActPow_SysRes_FSCH",//
             "DER_Scheduler_Control/ActPow_FSCH01", //
@@ -31,7 +31,7 @@ public class AllianderDER extends IEC61850Utility {
             "DER_Scheduler_Control/ActPow_FSCH10");
 
     public final ScheduleConstants maxPowerSchedules = ScheduleConstants.fromScheduleNames(
-            "DER_Scheduler_Control/MaxPow_GGIO",//
+            "DER_Scheduler_Control/MaxPow_GGIO1",//
             "DER_Scheduler_Control/MaxPow_FSCC",//
             "DER_Scheduler_Control/MaxPow_SysRes_FSCH",//
             "DER_Scheduler_Control/MaxPow_FSCH01", //
@@ -46,7 +46,7 @@ public class AllianderDER extends IEC61850Utility {
             "DER_Scheduler_Control/MaxPow_FSCH10");
 
     public final ScheduleConstants onOffSchedules = ScheduleConstants.fromScheduleNames(
-            "DER_Scheduler_Control/OnOffPow_GGIO",//
+            "DER_Scheduler_Control/OnOffPow_GGIO1",//
             "DER_Scheduler_Control/OnOffPow_FSCC",//
             "DER_Scheduler_Control/OnOffPow_SysRes_FSCH",//
             "DER_Scheduler_Control/OnOffPow_FSCH01", //
