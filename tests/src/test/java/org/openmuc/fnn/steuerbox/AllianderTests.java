@@ -39,7 +39,7 @@ public class AllianderTests extends AllianderBaseTest {
         // ...
     }
 
-    @ParameterizedTest
+    @ParameterizedTest(name = "tenSchedulesAreSupportedPerType running {0}")
     @MethodSource("getScheduleTypes")
     void tenSchedulesAreSupportedPerType(ScheduleConstants scheduleConstants) {
         int j = 0;
@@ -55,19 +55,20 @@ public class AllianderTests extends AllianderBaseTest {
     /**
      * Covers {@link Requirements#S10}
      */
-    @ParameterizedTest
+    @ParameterizedTest(name = "scheduleSupports100values running {0}")
     @MethodSource("getScheduleTypes")
     void scheduleSupports100values(ScheduleConstants scheduleConstants) {
         for (String scheduleName : scheduleConstants.getAllScheduleNames()) {
             for (int i = 1; i <= 100; i++) {
                 String numberAsStringFilledUpWithZeros = String.format("%03d", i);
-                boolean valueExists = dut.nodeExists(scheduleName + ".ValASG" + numberAsStringFilledUpWithZeros);
-                Assertions.assertTrue(valueExists);
+                String valueConfigurationNode = scheduleName + ".ValASG" + numberAsStringFilledUpWithZeros;
+                boolean valueExists = dut.nodeExists(valueConfigurationNode);
+                Assertions.assertTrue(valueExists, "Missing node " + valueConfigurationNode);
             }
         }
     }
 
-    @ParameterizedTest
+    @ParameterizedTest(name = "scheduleSupportsTimebasedScheduling running {0}")
     @MethodSource("getScheduleTypes")
     void scheduleSupportsTimebasedScheduling(ScheduleConstants scheduleConstants) {
         for (int i = 1; i <= 10; i++) {
@@ -77,7 +78,7 @@ public class AllianderTests extends AllianderBaseTest {
         }
     }
 
-    @ParameterizedTest
+    @ParameterizedTest(name = "allExpectedSchedulesExist running {0}")
     @MethodSource("getScheduleTypes")
     void allExpectedSchedulesExist(ScheduleConstants scheduleConstants) {
         for (String scheduleName : scheduleConstants.getAllScheduleNames()) {
