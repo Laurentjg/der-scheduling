@@ -61,6 +61,9 @@ struct sSchedule {
     bool allowWriteToStrTm;
     bool allowWriteToSchdReuse;
 
+    bool isTimeTriggerd; /* when the schedule has at least one StrTm object */
+    bool isPeriodic;     /* when the schedule has at least one StrTm object with a setCal attribute */
+
     LinkedList knownScheduleControllers; /* list of ScheduleControllers to inform on state/value change events */
 };
 

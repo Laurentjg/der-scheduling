@@ -40,6 +40,40 @@ schedule_getState(Schedule self)
 }
 
 static void
+checkIfTimeTriggeredAndPeriodic(Schedule self)
+{
+    self->isTimeTriggerd = false;
+    self->isPeriodic = false;
+
+    /* check if schedule has a StrTm object */
+
+    LinkedList dataObjects = ModelNode_getChildren((ModelNode*)self->scheduleLn);
+
+    LinkedList doElem = LinkedList_getNext(dataObjects);
+
+    while (doElem) {
+        DataObject* dObj = (DataObject*)LinkedList_getData(doElem);
+
+        /* check that data object name is "StrTmXXX" */
+        if (checkIfStrTm(dObj->name)) {
+            self->isTimeTriggerd = true;
+
+            /* check if "StrTm" has a "setVal" element */
+            ModelNode* setCal = ModelNode_getChild((ModelNode*)dObj, "setCal");
+
+            if (setCal) {
+                self->isPeriodic = true;
+                break;
+            }
+        }
+
+        doElem = LinkedList_getNext(doElem);
+    }
+
+    LinkedList_destroyStatic(dataObjects);
+}
+
+static void
 schedule_setState(Schedule self, ScheduleState newState)
 {
     DataAttribute* schdSt_stVal = (DataAttribute*)ModelNode_getChild((ModelNode*)self->schdSt, "stVal");
@@ -91,7 +125,8 @@ schedule_udpateState(Schedule self, ScheduleState newState)
     }
 }
 
-static void updateIntStatusValue(IedServer server, DataObject* dobj, int32_t value, uint64_t timestamp)
+static void
+updateIntStatusValue(IedServer server, DataObject* dobj, int32_t value, uint64_t timestamp)
 {
     DataAttribute* stVal = (DataAttribute*)ModelNode_getChild((ModelNode*)dobj, "stVal");
 
@@ -485,8 +520,6 @@ schdPrio_writeAccessHandler(DataAttribute* dataAttribute, MmsValue* value, Clien
     if (self->allowWriteToSchdPrio) {
         int prio = MmsValue_toInt32(value);
 
-        printf("SchPrio.setVal: %i\n", prio);
-
         IedServer_updateAttributeValue(self->server, dataAttribute, value);
 
         /* send PRIO_UPDATED event to schedule controller(s) */
@@ -500,8 +533,6 @@ schdPrio_writeAccessHandler(DataAttribute* dataAttribute, MmsValue* value, Clien
 
             controllerElem = LinkedList_getNext(controllerElem);
         }
-
-        printf("--> return OK\n");
 
         return DATA_ACCESS_ERROR_SUCCESS;
     }
@@ -580,33 +611,13 @@ checkSyncInput(Schedule self)
 static bool
 isTimeTriggered(Schedule self)
 {
-    // check if schedule has a StrTm object
-    bool hasStrTm = false;
-
-    LinkedList dataObjects = ModelNode_getChildren((ModelNode*)self->scheduleLn);
-
-    LinkedList doElem = LinkedList_getNext(dataObjects);
-
-    while (doElem) {
-        DataObject* dObj = (DataObject*)LinkedList_getData(doElem);
-
-        // check that data object name is "StrTmXXX"
-        if (checkIfStrTm(dObj->name)) {
-            hasStrTm = true;
-            break;
-        }
-
-        doElem = LinkedList_getNext(doElem);
-    }
-
-    LinkedList_destroyStatic(dataObjects);
-
-    return hasStrTm;
+    return self->isTimeTriggerd;
 }
 
-static bool isPeriodic(Schedule self)
+static bool
+isPeriodic(Schedule self)
 {
-
+    return self->isPeriodic;
 }
 
 static void
@@ -652,38 +663,31 @@ getStartTime(DataObject* strTm)
 }
 
 static bool
-checkForValidStartTimes(Schedule self)
+hasSetTm(DataObject* dobj)
 {
-    bool hasValidStartTimes = false;
-    //TODO check data objects for StrTm objects
+    ModelNode* setTm = ModelNode_getChild((ModelNode*)dobj, "setTm");
 
-    uint64_t currentTime = Hal_getTimeInMs();
-
-    LinkedList dataObjects = ModelNode_getChildren((ModelNode*)self->scheduleLn);
-
-    LinkedList doElem = LinkedList_getNext(dataObjects);
-
-    while (doElem) {
-        DataObject* dObj = (DataObject*)LinkedList_getData(doElem);
-
-        // check that data object name is "StrTmXXX"
-        if (checkIfStrTm(dObj->name)) {
-            printf("INFO: Found start time: %s\n", dObj->name);
-
-            if (getStartTime(dObj) > currentTime) {
-                hasValidStartTimes = true;
-            }
-            else {
-                printf("     start time is in the past!\n");
-            }
-        }
-
-        doElem = LinkedList_getNext(doElem);
+    if (setTm) {
+        //TODO check type?
+        return true;
     }
+    else {
+        return false;
+    }
+}
 
-    LinkedList_destroyStatic(dataObjects);
+static bool
+hasSetCal(DataObject* dobj)
+{
+    ModelNode* setCal = ModelNode_getChild((ModelNode*)dobj, "setCal");
 
-    return hasValidStartTimes;
+    if (setCal) {
+        //TODO check type?
+        return true;
+    }
+    else {
+        return false;
+    }
 }
 
 static uint64_t
@@ -757,6 +761,65 @@ schedule_getNumEntrValue(Schedule self)
     }
     
     return numEntrVal;
+}
+
+static bool
+checkForValidStartTimes(Schedule self)
+{
+    bool hasValidStartTimes = false;
+
+    uint64_t currentTime = Hal_getTimeInMs();
+
+    LinkedList dataObjects = ModelNode_getChildren((ModelNode*)self->scheduleLn);
+
+    LinkedList doElem = LinkedList_getNext(dataObjects);
+
+    uint64_t scheduleDurationMs = 0;
+    
+    int numEntryVal = schedule_getNumEntrValue(self);
+
+    if (numEntryVal > 0) {
+        scheduleDurationMs = getSchdIntvValueInMs(self) * numEntryVal;
+    }
+    
+    while (doElem) {
+        DataObject* dObj = (DataObject*)LinkedList_getData(doElem);
+
+        // check that data object name is "StrTmXXX"
+        if (checkIfStrTm(dObj->name)) {
+            printf("INFO: Found start time: %s\n", dObj->name);
+
+            if (isPeriodic(self)) {
+                if (hasSetCal(dObj)) {
+                    if (hasSetTm(dObj)) {
+                        if (getStartTime(dObj) < currentTime) {
+                            hasValidStartTimes = true;
+                        }
+                    }
+                    else {
+                        hasValidStartTimes = true;
+                    }
+                }
+                else {
+                    printf("DEBUG: start time of periodic schedule is missing setCal -> ignore\n");
+                }
+            }
+            else {
+                if (getStartTime(dObj) + scheduleDurationMs > currentTime) {
+                    hasValidStartTimes = true;
+                }
+                else {
+                    printf("     start time is in the past and consumed!\n");
+                }
+            }
+        }
+
+        doElem = LinkedList_getNext(doElem);
+    }
+
+    LinkedList_destroyStatic(dataObjects);
+
+    return hasValidStartTimes;
 }
 
 static bool
@@ -1277,6 +1340,8 @@ Schedule_create(LogicalNode* schedLn, IedServer server, IedModel* model)
                     printf("ERROR: Found EvTrg but InSyn.setSrcRef not present\n");
                 }
             }
+
+            checkIfTimeTriggeredAndPeriodic(self);
 
             self->targetType = targetType;
 
