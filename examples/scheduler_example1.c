@@ -2,10 +2,21 @@
 
 #include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include <libiec61850/hal_thread.h>
 
 static bool running = false;
+
+static Semaphore outputQueueLock = NULL;
+static LinkedList outputQueue = NULL;
+
+struct sOutputData {
+    char* targetObjRef;
+    char* targetValue;
+};
+
+typedef struct sOutputData* OutputData;
 
 static void
 sigint_handler(int signalId)
@@ -18,17 +29,78 @@ scheduler_TargetValueChanged(void* parameter, const char* targetValueObjRef, Mms
 {
     char mmsValueBuf[200];
     if (value) {
-       MmsValue_printToBuffer(value, mmsValueBuf, 200);
+        MmsValue_printToBuffer(value, mmsValueBuf, 200);
 
-       printf("Target value changed: %s: %s\n", targetValueObjRef, mmsValueBuf);
+        printf("Received target value change: %s: %s\n", targetValueObjRef, mmsValueBuf);
 
-       //TODO call bash script for demo?
+        OutputData outputData = malloc(sizeof(struct sOutputData));
+
+        if (outputData) {
+            outputData->targetObjRef = strdup(targetValueObjRef);
+            outputData->targetValue = strdup(mmsValueBuf);
+
+            Semaphore_wait(outputQueueLock);
+
+            LinkedList_add(outputQueue, outputData);
+
+            Semaphore_post(outputQueueLock);
+        }
+    }
+}
+
+static void*
+outputWorkerThread(void* parameter)
+{
+    while (running) 
+    {
+        bool isEmpty = true;
+
+        OutputData outputData = NULL;
+
+        Semaphore_wait(outputQueueLock);
+
+        LinkedList firstElement = LinkedList_get(outputQueue, 0);
+
+        if (firstElement) {
+            outputData = LinkedList_getData(firstElement);
+
+            LinkedList_remove(outputQueue, outputData);
+
+            firstElement = LinkedList_get(outputQueue, 0);
+
+            if (firstElement)
+                isEmpty = false;
+        }
+
+        Semaphore_post(outputQueueLock);
+
+        if (outputData) {
+            printf("Target value changed: %s: %s\n", outputData->targetObjRef, outputData->targetValue);
+
+            /* call bash script for demo */
+            char cmdBuf[500];
+            snprintf(cmdBuf, 499, "./set_output.sh %s %s", outputData->targetObjRef, outputData->targetValue);
+
+            system(cmdBuf);
+
+            free(outputData->targetObjRef);
+            free(outputData->targetValue);
+            free(outputData);
+        }
+
+        if (isEmpty) 
+            Thread_sleep(50);
     }
 }
 
 int
 main(int argc, char** argv)
 {
+    outputQueue = LinkedList_create();
+    outputQueueLock = Semaphore_create(1);
+
+    signal(SIGINT, sigint_handler);
+
     IedModel* model = ConfigFileParser_createModelFromConfigFileEx("model.cfg");
 
     if (model) {
@@ -61,11 +133,15 @@ main(int argc, char** argv)
         Scheduler_enableSchedule(sched, "@Control/MaxPow_Res_FSCH01", true);
         Scheduler_enableSchedule(sched, "@Control/OnOff_Res_FSCH01", true);
 
+        Thread workerThread = Thread_create(outputWorkerThread, NULL, false);
+
         IedServer_start(server, 102);
 
         if (IedServer_isRunning(server)) {
 
             running = true;
+
+            Thread_start(workerThread);
 
             while (running) {
                 Thread_sleep(100);
@@ -78,8 +154,13 @@ main(int argc, char** argv)
         Scheduler_destroy(sched);
         IedServer_destroy(server);
         IedModel_destroy(model);
+
+        Thread_destroy(workerThread);
     }
     else {
         printf("ERROR: Failed to load data model\n");
     }
+
+    LinkedList_destroy(outputQueue);
+    Semaphore_destroy(outputQueueLock);
 }
