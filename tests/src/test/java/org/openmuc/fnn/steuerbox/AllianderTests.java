@@ -2,6 +2,7 @@ package org.openmuc.fnn.steuerbox;
 
 import com.beanit.iec61850bean.ServiceError;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -29,6 +30,8 @@ public class AllianderTests extends AllianderBaseTest {
      * @throws IOException
      *         {@link org.openmuc.fnn.steuerbox.models.Requirements#C01a}
      */
+    // TODO: clearify with MZ/Alliander if this requirement is actually needed; then update + enable test
+    @Disabled
     @Test
     void requirement_C01_a_activePowerReserveSchedule() throws ServiceError, IOException {
         String sclFileName = "config.xml";
@@ -40,7 +43,7 @@ public class AllianderTests extends AllianderBaseTest {
     }
 
     @ParameterizedTest(name = "tenSchedulesAreSupportedPerType running {0}")
-    @MethodSource("getScheduleTypes")
+    @MethodSource("getAllSchedules")
     void tenSchedulesAreSupportedPerType(ScheduleConstants scheduleConstants) {
         int j = 0;
         for (String scheduleName : scheduleConstants.getAllScheduleNames()) {
@@ -56,12 +59,17 @@ public class AllianderTests extends AllianderBaseTest {
      * Covers {@link Requirements#S10}
      */
     @ParameterizedTest(name = "scheduleSupports100values running {0}")
-    @MethodSource("getScheduleTypes")
+    @MethodSource("getAllSchedules")
     void scheduleSupports100values(ScheduleConstants scheduleConstants) {
         for (String scheduleName : scheduleConstants.getAllScheduleNames()) {
+            String valNodeName;
+            if (scheduleConstants.getScheduleType() == ScheduleConstants.ScheduleType.SPG)
+                valNodeName = ".ValSPG";
+            else
+                valNodeName = ".ValASG";
             for (int i = 1; i <= 100; i++) {
                 String numberAsStringFilledUpWithZeros = String.format("%03d", i);
-                String valueConfigurationNode = scheduleName + ".ValASG" + numberAsStringFilledUpWithZeros;
+                String valueConfigurationNode = scheduleName + valNodeName + numberAsStringFilledUpWithZeros;
                 boolean valueExists = dut.nodeExists(valueConfigurationNode);
                 Assertions.assertTrue(valueExists, "Missing node " + valueConfigurationNode);
             }
@@ -69,7 +77,7 @@ public class AllianderTests extends AllianderBaseTest {
     }
 
     @ParameterizedTest(name = "scheduleSupportsTimebasedScheduling running {0}")
-    @MethodSource("getScheduleTypes")
+    @MethodSource("getAllSchedules")
     void scheduleSupportsTimebasedScheduling(ScheduleConstants scheduleConstants) {
         for (int i = 1; i <= 10; i++) {
             String aTimerNode = scheduleConstants.getScheduleName(i) + ".StrTm01";
@@ -79,7 +87,7 @@ public class AllianderTests extends AllianderBaseTest {
     }
 
     @ParameterizedTest(name = "allExpectedSchedulesExist running {0}")
-    @MethodSource("getScheduleTypes")
+    @MethodSource("getAllSchedules")
     void allExpectedSchedulesExist(ScheduleConstants scheduleConstants) {
         for (String scheduleName : scheduleConstants.getAllScheduleNames()) {
             org.assertj.core.api.Assertions.assertThat(dut.nodeExists(scheduleName))

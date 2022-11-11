@@ -7,10 +7,12 @@ import com.beanit.iec61850bean.ObjectReference;
 import com.beanit.iec61850bean.ServiceError;
 import org.assertj.core.api.Assertions;
 import org.assertj.core.data.Percentage;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.openmuc.fnn.steuerbox.models.AllianderDER;
 import org.openmuc.fnn.steuerbox.models.Requirements;
 import org.openmuc.fnn.steuerbox.models.ScheduleConstants;
+import org.openmuc.fnn.steuerbox.models.ScheduleConstants.ScheduleType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,16 +33,23 @@ public abstract class AllianderBaseTest {
 
     private static final Logger logger = LoggerFactory.getLogger(ScheduleNodeTests.class);
 
+    // TODO: dut should only be required to init schedule access, that should be designed to have a better interface than the IEC61850Utility!
     protected static AllianderDER dut;
 
     @BeforeAll
     public static void init() throws ServiceError, IOException {
         dut = AllianderDER.getWithDefaultSettings();
+
+        disableAllRunningSchedules();
     }
 
-    @BeforeAll
+    @AfterAll
+    public static void shutdownConnection() {
+        dut.close();
+    }
+
     public static void disableAllRunningSchedules() {
-        getScheduleTypes().forEach(scheduleType -> {
+        getAllSchedules().forEach(scheduleType -> {
             scheduleType.getAllScheduleNames().forEach(schedule -> {
                 try {
                     dut.disableSchedules(schedule);
@@ -53,7 +62,21 @@ public abstract class AllianderBaseTest {
         logger.debug("Disabled all schedules during init");
     }
 
-    protected static Stream<ScheduleConstants> getScheduleTypes() {
+    /**
+     * These schedules use float values for scheduling
+     */
+    protected static Stream<ScheduleConstants> getPowerValueSchedules() {
+        return getAllSchedules().filter(s -> ScheduleType.ASG == s.getScheduleType());
+    }
+
+    /**
+     * These schedules use boolean values for scheduling
+     */
+    private static Stream<ScheduleConstants> getOnOffSchedules() {
+        return getAllSchedules().filter(s -> ScheduleType.SPG == s.getScheduleType());
+    }
+
+    protected static Stream<ScheduleConstants> getAllSchedules() {
         return Stream.of(dut.powerSchedules, dut.maxPowerSchedules, dut.onOffSchedules);
     }
 
@@ -120,12 +143,16 @@ public abstract class AllianderBaseTest {
         Collection<String> violations = new LinkedList<>();
 
         for (Map.Entry<String, Fc> entry : oMulti.entrySet()) {
-            List<ModelNode> occurencesThatContainKeyInName = dut.getNode(parentNode).getChildren().stream()//
+            List<ModelNode> occurencesThatContainKeyInName = dut.getNode(parentNode)
+                    .getChildren()
+                    .stream()//
                     .filter(childNode -> childNode.getName().contains(entry.getKey()))//
+                    .filter(childNode -> entry.getKey().equals(removeNumbers(childNode.getName())))
                     .collect(Collectors.toList());
 
             for (ModelNode foundOptionalNode : occurencesThatContainKeyInName) {
                 Fc actualFc = ((FcModelNode) foundOptionalNode).getFc();
+
                 if (!Objects.equals(entry.getValue(), actualFc)) {
                     violations.add("Omulti requirement: Node " + foundOptionalNode.getReference()
                             + " does not have expected type " + entry.getValue() + " but instead " + actualFc);
@@ -144,6 +171,13 @@ public abstract class AllianderBaseTest {
             }
         }
         return violations;
+    }
+
+    public static String removeNumbers(String stringWithNumbers) {
+        if (stringWithNumbers == null) {
+            return null;
+        }
+        return stringWithNumbers.replaceAll("[0-9]", "");
     }
 
     protected Collection<String> testMMulti(Map<String, Fc> mMulti, String parentNode) {

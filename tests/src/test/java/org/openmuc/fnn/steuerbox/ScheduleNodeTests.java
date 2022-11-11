@@ -1,6 +1,7 @@
 package org.openmuc.fnn.steuerbox;
 
 import com.beanit.iec61850bean.Fc;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.openmuc.fnn.steuerbox.models.ScheduleConstants;
@@ -27,8 +28,9 @@ public class ScheduleNodeTests extends AllianderBaseTest {
      * <p>
      * This test is not idenependent from our current use case
      **/
+    // TODO MZ: fix types of DsaReq, EnaReq
     @ParameterizedTest(name = "hasRequiredSubNodes running {0}")
-    @MethodSource("getScheduleTypes")
+    @MethodSource("getAllSchedules")
     void hasRequiredSubNodes(ScheduleConstants scheduleConstants) {
 
         // relevant part of the table is the "non-derived-statistics" (nds) column as there are no derived-statistic
@@ -124,8 +126,9 @@ public class ScheduleNodeTests extends AllianderBaseTest {
      * Test that SchdEntr is present and is updated by the currently running schedule as described in  IEC
      * 61850-90-10:2017, table 7 (page 26)
      **/
+    @Disabled
     @ParameterizedTest(name = "SchdEntrIsUpdatedWithCurrentlyRunningScheduleIfPresent running {0}")
-    @MethodSource("getScheduleTypes")
+    @MethodSource("getAllSchedules")
     void SchdEntrIsUpdatedWithCurrentlyRunningScheduleIfPresent(ScheduleConstants scheduleConstants) {
         // test if SchdEntr is available
 
@@ -153,7 +156,7 @@ public class ScheduleNodeTests extends AllianderBaseTest {
      * the expected behaviour). IEC 61850-90-10:2017, table 7 (page 26)
      **/
     @ParameterizedTest(name = "ValINSIsUpdatedWithCurrentlyRunningScheduleIfPresent running {0}")
-    @MethodSource("getScheduleTypes")
+    @MethodSource("getAllSchedules")
     void ValINSIsUpdatedWithCurrentlyRunningScheduleIfPresent(ScheduleConstants scheduleConstants) {
         testOptionalNodeNotPresent(scheduleConstants, "ValINS");
     }
@@ -163,9 +166,10 @@ public class ScheduleNodeTests extends AllianderBaseTest {
      * the expected behaviour). IEC 61850-90-10:2017, table 7 (page 26)
      **/
     @ParameterizedTest(name = "ValSpsIsUpdatedWithCurrentlyRunningScheduleIfPresent running {0}")
-    @MethodSource("getScheduleTypes")
+    @MethodSource("getPowerValueSchedules")
     void ValSpsIsUpdatedWithCurrentlyRunningScheduleIfPresent(ScheduleConstants scheduleConstants) {
         testOptionalNodeNotPresent(scheduleConstants, "ValSPS");
+        // TODO implement for OnOff schedules
     }
 
     /**
@@ -173,7 +177,7 @@ public class ScheduleNodeTests extends AllianderBaseTest {
      * the expected behaviour). IEC 61850-90-10:2017, table 7 (page 26)
      **/
     @ParameterizedTest(name = "ValEnsIsUpdatedWithCurrentlyRunningScheduleIfPresent running {0}")
-    @MethodSource("getScheduleTypes")
+    @MethodSource("getAllSchedules")
     void ValEnsIsUpdatedWithCurrentlyRunningScheduleIfPresent(ScheduleConstants scheduleConstants) {
         testOptionalNodeNotPresent(scheduleConstants, "ValENS");
     }
@@ -184,8 +188,9 @@ public class ScheduleNodeTests extends AllianderBaseTest {
      * See "Explanation" column of ActStrTm, NxtStrTm and ValMV. This test summarizes the requirements such that each
      * schedule needs to run only once. By doing so, the total test duration is reduced.
      **/
+    @Disabled
     @ParameterizedTest(name = "ActStrTm_and_NxtStrTm_ValMV_areUpdatedProperly running {0}")
-    @MethodSource("getScheduleTypes")
+    @MethodSource("getAllSchedules")
     void ActStrTm_and_NxtStrTm_ValMV_areUpdatedProperly(ScheduleConstants scheduleConstants) {
         /**
          * ActStrTm:
@@ -225,8 +230,9 @@ public class ScheduleNodeTests extends AllianderBaseTest {
      * Test that SchdEnaErr holds a reasonable error code after provoking errors whilest enabling schedules. See IEC
      * 61850-90-10:2017, table 7 (page 26)
      **/
+    @Disabled
     @ParameterizedTest(name = "EnaReq_operating running {0}")
-    @MethodSource("getScheduleTypes")
+    @MethodSource("getAllSchedules")
     void EnaReq_operating(ScheduleConstants scheduleConstants) {
         /**
          * (controllable) Operating with value true initiates
@@ -242,8 +248,9 @@ public class ScheduleNodeTests extends AllianderBaseTest {
      * Test that SchdEnaErr holds a reasonable error code after provoking errors whilest enabling schedules. See IEC
      * 61850-90-10:2017, table 7 (page 26)
      **/
+    @Disabled
     @ParameterizedTest(name = "DsaReq_operating running {0}")
-    @MethodSource("getScheduleTypes")
+    @MethodSource("getAllSchedules")
     void DsaReq_operating(ScheduleConstants scheduleConstants) {
         /**
          * (controllable) Operating with value true initiates
@@ -259,8 +266,9 @@ public class ScheduleNodeTests extends AllianderBaseTest {
      * Test that SchdEnaErr holds a reasonable error code after provoking errors whilest enabling schedules. See IEC
      * 61850-90-10:2017, table 7 (page 26)
      **/
+    @Disabled
     @ParameterizedTest(name = "SchdEnaErrHoldsErrorCode running {0}")
-    @MethodSource("getScheduleTypes")
+    @MethodSource("getAllSchedules")
     void SchdEnaErrHoldsErrorCode(ScheduleConstants scheduleConstants) {
         // TODO: implement with e.g. one example
 
@@ -271,8 +279,9 @@ public class ScheduleNodeTests extends AllianderBaseTest {
      * Test that NumEntr can only be set to values > 0  and values <= the number of  instantiated Val[ASG|ING|SPG|ENG]'s
      * as stated in IEC 61850-90-10:2017, table 7 (page 26)
      **/
+    @Disabled
     @ParameterizedTest(name = "NumEntr_range running {0}")
-    @MethodSource("getScheduleTypes")
+    @MethodSource("getAllSchedules")
     void NumEntr_range(ScheduleConstants scheduleConstants) {
         // TODO: test that it cannot be set to 0, -1 and 101
 

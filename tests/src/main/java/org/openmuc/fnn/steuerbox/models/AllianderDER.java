@@ -15,10 +15,10 @@ public class AllianderDER extends IEC61850Utility {
         return new AllianderDER("127.0.0.1", 102);
     }
 
-    public final ScheduleConstants powerSchedules = ScheduleConstants.fromScheduleNames(
+    public final ScheduleConstants powerSchedules = ScheduleConstants.ScheduleType.ASG.withScheduleNames(this,
             "DER_Scheduler_Control/ActPow_GGIO1",//
             "DER_Scheduler_Control/ActPow_FSCC1",//
-            "DER_Scheduler_Control/ActPow_SysRes_FSCH",//
+            "DER_Scheduler_Control/ActPow_Res_FSCH01",//
             "DER_Scheduler_Control/ActPow_FSCH01", //
             "DER_Scheduler_Control/ActPow_FSCH02", //
             "DER_Scheduler_Control/ActPow_FSCH03", //
@@ -30,10 +30,10 @@ public class AllianderDER extends IEC61850Utility {
             "DER_Scheduler_Control/ActPow_FSCH09", //
             "DER_Scheduler_Control/ActPow_FSCH10");
 
-    public final ScheduleConstants maxPowerSchedules = ScheduleConstants.fromScheduleNames(
+    public final ScheduleConstants maxPowerSchedules = ScheduleConstants.ScheduleType.ASG.withScheduleNames(this,
             "DER_Scheduler_Control/MaxPow_GGIO1",//
             "DER_Scheduler_Control/MaxPow_FSCC1",//
-            "DER_Scheduler_Control/MaxPow_SysRes_FSCH",//
+            "DER_Scheduler_Control/MaxPow_Res_FSCH01",//
             "DER_Scheduler_Control/MaxPow_FSCH01", //
             "DER_Scheduler_Control/MaxPow_FSCH02", //
             "DER_Scheduler_Control/MaxPow_FSCH03", //
@@ -45,18 +45,18 @@ public class AllianderDER extends IEC61850Utility {
             "DER_Scheduler_Control/MaxPow_FSCH09", //
             "DER_Scheduler_Control/MaxPow_FSCH10");
 
-    public final ScheduleConstants onOffSchedules = ScheduleConstants.fromScheduleNames(
-            "DER_Scheduler_Control/OnOffPow_GGIO1",//
-            "DER_Scheduler_Control/OnOffPow_FSCC1",//
-            "DER_Scheduler_Control/OnOffPow_SysRes_FSCH",//
-            "DER_Scheduler_Control/OnOffPow_FSCH01", //
-            "DER_Scheduler_Control/OnOffPow_FSCH02", //
-            "DER_Scheduler_Control/OnOffPow_FSCH03", //
-            "DER_Scheduler_Control/OnOffPow_FSCH04", //
-            "DER_Scheduler_Control/OnOffPow_FSCH05", //
-            "DER_Scheduler_Control/OnOffPow_FSCH06", //
-            "DER_Scheduler_Control/OnOffPow_FSCH07", //
-            "DER_Scheduler_Control/OnOffPow_FSCH08", //
-            "DER_Scheduler_Control/OnOffPow_FSCH09", //
-            "DER_Scheduler_Control/OnOffPow_FSCH10");
+    public final ScheduleConstants onOffSchedules = ScheduleConstants.ScheduleType.SPG.withScheduleNames(this,
+            "DER_Scheduler_Control/OnOff_GGIO1",//
+            "DER_Scheduler_Control/OnOff_FSCC1",//
+            "DER_Scheduler_Control/OnOff_Res_FSCH01",//
+            "DER_Scheduler_Control/OnOff_FSCH01", //
+            "DER_Scheduler_Control/OnOff_FSCH02", //
+            "DER_Scheduler_Control/OnOff_FSCH03", //
+            "DER_Scheduler_Control/OnOff_FSCH04", //
+            "DER_Scheduler_Control/OnOff_FSCH05", //
+            "DER_Scheduler_Control/OnOff_FSCH06", //
+            "DER_Scheduler_Control/OnOff_FSCH07", //
+            "DER_Scheduler_Control/OnOff_FSCH08", //
+            "DER_Scheduler_Control/OnOff_FSCH09", //
+            "DER_Scheduler_Control/OnOff_FSCH10");
 }

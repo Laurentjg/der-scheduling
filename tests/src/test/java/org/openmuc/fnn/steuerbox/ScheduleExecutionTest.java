@@ -1,19 +1,17 @@
 package org.openmuc.fnn.steuerbox;
 
 import com.beanit.iec61850bean.ServiceError;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.openmuc.fnn.steuerbox.models.Requirements;
 import org.openmuc.fnn.steuerbox.models.ScheduleConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.xml.sax.SAXException;
 
-import javax.xml.parsers.ParserConfigurationException;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.List;
 
@@ -27,6 +25,16 @@ public class ScheduleExecutionTest extends AllianderBaseTest {
 
     private static final Logger log = LoggerFactory.getLogger(ScheduleExecutionTest.class);
 
+    @BeforeAll
+    public static void configureReserveSchedule() throws ServiceError, IOException {
+        dut.writeScheduleValues(
+                dut.powerSchedules.getValueAccess().prepareWriting(0, dut.powerSchedules.getReserveSchedule()));
+        dut.writeScheduleValues(
+                dut.maxPowerSchedules.getValueAccess().prepareWriting(0, dut.maxPowerSchedules.getReserveSchedule()));
+        dut.writeScheduleValues(
+                dut.onOffSchedules.getValueAccess().prepareWriting(false, dut.onOffSchedules.getReserveSchedule()));
+    }
+
     /**
      * based on 6185-90-10 {@link Requirements#E02} {@link Requirements#S02} {@link Requirements#S05a}{@link
      * Requirements#S05b}{@link Requirements#S05c} {@link Requirements#E01}
@@ -35,10 +43,12 @@ public class ScheduleExecutionTest extends AllianderBaseTest {
      * <p>
      * TODO do the same for all three kinds of schedules
      */
+    // TODO MZ: these tests currently fail because after the last schedule has run, the reserve schedule value is not
+    //  used but instead the most recent set value remains.
     @ParameterizedTest(name = "test_priorities running {0}")
-    @MethodSource("getScheduleTypes")
+    @MethodSource("getPowerValueSchedules")
     public void test_priorities(ScheduleConstants scheduleConstants)
-            throws ServiceError, IOException, InterruptedException {
+            throws ServiceError, IOException, InterruptedException, IEC61850MissconfiguredException {
 
         final Duration interval = ofSeconds(2);
 
@@ -46,177 +56,118 @@ public class ScheduleExecutionTest extends AllianderBaseTest {
         final Instant schedulesStart = testExecutionStart.plus(ofSeconds(10));
 
         //schedule 1:
-        dut.writeAndEnableSchedule(Arrays.asList(10, 30, 70, 100, 100, 100), interval,
-                scheduleConstants.getScheduleName(1), schedulesStart.plus(interval), 25);
+        dut.writeAndEnableSchedule(scheduleConstants.getValueAccess()
+                        .prepareWriting(Arrays.asList(10, 30, 70, 100, 100, 100), scheduleConstants.getScheduleName(1)),
+                interval, schedulesStart.plus(interval), 25);
 
         // schedule 2:
-        dut.writeAndEnableSchedule(Arrays.asList(11, 31, 71, 99, 99, 99), interval,
-                scheduleConstants.getScheduleName(2), schedulesStart.plus(interval.multipliedBy(5)), 40);
+        dut.writeAndEnableSchedule(scheduleConstants.getValueAccess()
+                        .prepareWriting(Arrays.asList(11, 31, 71, 99, 99, 99), scheduleConstants.getScheduleName(2)), interval,
+                schedulesStart.plus(interval.multipliedBy(5)), 40);
 
         // schedule 3:
-        dut.writeAndEnableSchedule(Arrays.asList(12, 32, 72, 98, 98), interval, scheduleConstants.getScheduleName(3),
+        dut.writeAndEnableSchedule(scheduleConstants.getValueAccess()
+                        .prepareWriting(Arrays.asList(12, 32, 72, 98, 98), scheduleConstants.getScheduleName(3)), interval,
                 schedulesStart.plus(interval.multipliedBy(9)), 60);
 
         //schedule 4, ends after 44s:
-        dut.writeAndEnableSchedule(Arrays.asList(13, 33, 73, 97, 97, 97, 97, 97, 97, 97), interval,
-                scheduleConstants.getScheduleName(4), schedulesStart.plus(interval.multipliedBy(13)), 70);
+        dut.writeAndEnableSchedule(scheduleConstants.getValueAccess()
+                        .prepareWriting(Arrays.asList(13, 33, 73, 97, 97, 97, 97, 97, 97, 97),
+                                scheduleConstants.getScheduleName(4)), interval, schedulesStart.plus(interval.multipliedBy(13)),
+                70);
 
         //schedule 5, ends after 42s
-        dut.writeAndEnableSchedule(Arrays.asList(70, 70, 70, 70, 70), interval, scheduleConstants.getScheduleName(5),
+        dut.writeAndEnableSchedule(scheduleConstants.getValueAccess()
+                        .prepareWriting(Arrays.asList(70, 70, 70, 70, 70), scheduleConstants.getScheduleName(5)), interval,
                 schedulesStart.plus(interval.multipliedBy(17)), 100);
 
         //schedule 6,
-        dut.writeAndEnableSchedule(Arrays.asList(90), interval, scheduleConstants.getScheduleName(6),
+        dut.writeAndEnableSchedule(scheduleConstants.getValueAccess()
+                        .prepareWriting(Arrays.asList(90), scheduleConstants.getScheduleName(6)), interval,
                 schedulesStart.plus(interval.multipliedBy(18)), 120);
 
         //schedule 7,
 
-        dut.writeAndEnableSchedule(Arrays.asList(90), interval, scheduleConstants.getScheduleName(7),
+        dut.writeAndEnableSchedule(scheduleConstants.getValueAccess()
+                        .prepareWriting(Arrays.asList(90), scheduleConstants.getScheduleName(7)), interval,
                 schedulesStart.plus(interval.multipliedBy(20)), 120);
 
         //schedule 8:
-
-        dut.writeAndEnableSchedule(Arrays.asList(10), interval, scheduleConstants.getScheduleName(8),
+        dut.writeAndEnableSchedule(scheduleConstants.getValueAccess()
+                        .prepareWriting(Arrays.asList(10), scheduleConstants.getScheduleName(8)), interval,
                 schedulesStart.plus(interval.multipliedBy(22)), 80);
 
         //schedule 9
-        dut.writeAndEnableSchedule(Arrays.asList(80), interval, scheduleConstants.getScheduleName(9),
+        dut.writeAndEnableSchedule(scheduleConstants.getValueAccess()
+                        .prepareWriting(Arrays.asList(80), scheduleConstants.getScheduleName(9)), interval,
                 schedulesStart.plus(interval.multipliedBy(23)), 20);
 
         //schedule 10
-        dut.writeAndEnableSchedule(Arrays.asList(100), interval, scheduleConstants.getScheduleName(10),
+        dut.writeAndEnableSchedule(scheduleConstants.getValueAccess()
+                        .prepareWriting(Arrays.asList(100), scheduleConstants.getScheduleName(10)), interval,
                 schedulesStart.plus(interval.multipliedBy(24)), 11);
 
         log.debug("Test setup took {}", Duration.between(testExecutionStart, now()));
 
-        // TODO: read system reserve schedule
-        float sysResValue = 0f;
+        float sysResValue = (float) dut.readConstantPowerFromSysResScheduleFromModelNode(
+                scheduleConstants.getValueAccess(), scheduleConstants.getReserveSchedule());
+
         List<Float> expectedValues = Arrays.asList(sysResValue, 10f, 30f, 70f, 100f, 11f, 31f, 71f, 99f, 12f, 32f, 72f,
                 98f, 13f, 33f, 73f, 97f, 70f, 90f, 70f, 90f, 70f, 10f, 80f, 100f, sysResValue);
 
         List<Float> actualValues = dut.monitor(schedulesStart.plus(interval.dividedBy(2)), interval.multipliedBy(26),
                 interval, scheduleConstants);
+
         log.info("expected values {}", expectedValues);
         log.info("observed values {}", actualValues);
 
         assertValuesMatch(expectedValues, actualValues, 0.01);
     }
 
-    @ParameterizedTest(name = "testSchedulePriosWithTwoSchedules running {0}")
-    @MethodSource("getScheduleTypes")
-    public void testSchedulePriosWithTwoSchedules(ScheduleConstants scheduleConstants)
-            throws ServiceError, IOException, InterruptedException {
+    // TODO implement a test similar to the above for OnOff schedules
+    public void test_prioritiesOnOffSchedules() throws ServiceError, IOException {
 
-        // FIXME: read system reserve
-        float sysresValue = 0;//dut.readSysResScheduleReturnConstantPower();
-        // add some time to configure, then truncate to seconds to make everything more
-        // nicely to look at
-        Duration configurationBuffer = ofSeconds(10);
-        Instant start = now().plus(configurationBuffer).truncatedTo(ChronoUnit.SECONDS);
+        final Duration interval = ofSeconds(2);
 
-        Duration stepwidth = ofSeconds(4);
+        final Instant testExecutionStart = now();
+        final Instant schedulesStart = testExecutionStart.plus(ofSeconds(10));
 
-        Instant schedule1Start = start.plus(stepwidth);
-        Instant schedule2Start = schedule1Start.plus(stepwidth);
+        // wie test_priorities nur mit 0/1 werten. idealerweise ist immer nur 1 schedule 1 oder 0, sodass man sieht dass das scheduling hier funktioniert
 
-        float schaltprogramValue1 = 20;
-        float schaltprogramValue2 = 50;
+        // TODO: dut.monitor(...) does not work with OnOff schedules yet
 
-        dut.writeAndEnableSchedule(
-                Arrays.asList(schaltprogramValue1, schaltprogramValue2, schaltprogramValue1, schaltprogramValue2),
-                stepwidth, scheduleConstants.getScheduleName(1), schedule1Start, 100);
-
-        float notbefehlValue = 77;
-        dut.writeAndEnableSchedule(Arrays.asList(notbefehlValue), stepwidth, scheduleConstants.getScheduleName(2),
-                schedule2Start, 200);
-
-        List<Float> expectedValues = Arrays.asList(sysresValue, schaltprogramValue1, notbefehlValue,
-                schaltprogramValue1, schaltprogramValue2, sysresValue);
-
-        // start monitoring half a stepwith after start such that it
-        Duration halfStepwidth = stepwidth.dividedBy(2);
-        Instant monitoringStart = start.plus(halfStepwidth);
-        List<Float> actualValues = dut.monitor(monitoringStart, stepwidth.multipliedBy(6), stepwidth,
-                scheduleConstants);
-
-        log.info("expected values {}", expectedValues);
-        log.info("observed values {}", actualValues);
-
-        assertValuesMatch(expectedValues, actualValues, 0.01);
-
-        log.info("schedule prio test passed :)");
-
-        //disable used schedules in the end for them to be ready for further tests
-        dut.disableSchedule(scheduleConstants.getScheduleName(1));
-        dut.disableSchedule(scheduleConstants.getScheduleName(2));
+        // TODO: implement test
     }
 
-    @ParameterizedTest(name = "testRisingPriorities running {0}")
-    @MethodSource("getScheduleTypes")
-    public void testRisingPriorities(ScheduleConstants scheduleConstants)
-            throws ServiceError, IOException, InterruptedException, ParserConfigurationException,
-            IEC61850MissconfiguredException, SAXException {
-
-        //Delayed start of all schedules to have enough time for data transfer, more schedules->more delay
-        final Instant testExecutionStart = now().plus(ofSeconds(10));
-        //final Instant reportingStart = testExecutionStart.plus(Duration.ofSeconds(8));
-        final Instant schedulesStart = testExecutionStart.plus(ofSeconds(4));
-
-        //Duration.ofSeconds() is the duration each value of Array.asList is executed
-        //schedule 1: start after 2s, duration: 12s, priority: 15
-        dut.writeAndEnableSchedule(Arrays.asList(10, 10, 10, 10, 10, 10), ofSeconds(4),
-                scheduleConstants.getScheduleName(1), schedulesStart, 15);
-
-        // schedule 2: start after 4s, duration 10s, priority 20
-        dut.writeAndEnableSchedule(Arrays.asList(40, 40, 40, 40, 40), ofSeconds(4),
-                scheduleConstants.getScheduleName(2), schedulesStart.plus(ofSeconds(4)), 20);
-
-        // schedule 3: start after 6s, duration 8s, priority 30
-        dut.writeAndEnableSchedule(Arrays.asList(70, 70, 70, 70), ofSeconds(4), scheduleConstants.getScheduleName(3),
-                schedulesStart.plus(ofSeconds(8)), 30);
-
-        //schedule 4: start after 8s, duration 6s, priority 40
-        dut.writeAndEnableSchedule(Arrays.asList(100, 100, 100), ofSeconds(4), scheduleConstants.getScheduleName(4),
-                schedulesStart.plus(ofSeconds(12)), 40);
-
-        List<Float> expectedValues = Arrays.asList(0f, 10f, 40f, 70.0f, 100f, 100f, 100f, 0f);
-
-        Instant monitoringStart = testExecutionStart.plus(ofSeconds(2));
-        List<Float> actualValues = dut.monitor(monitoringStart, ofSeconds(32), ofSeconds(4), scheduleConstants);
-
-        log.info("expected values {}", expectedValues);
-        log.info("observed values {}", actualValues);
-
-        assertValuesMatch(expectedValues, actualValues, 0.01);
-
-        //disable all schedules in the end for them to be ready for further tests
-        for (int i = 1; i <= 4; i++) {
-            dut.disableSchedule(scheduleConstants.getScheduleName(i));
-        }
-    }
-
+    // TODO MZ: what do we expect here? (I would implement the test such that it matches what you implemented)
     @ParameterizedTest(name = "testSamePrios running {0}")
-    @MethodSource("getScheduleTypes")
+    @MethodSource("getPowerValueSchedules")
     public void testSamePrios(ScheduleConstants scheduleConstants)
-            throws ServiceError, IOException, InterruptedException {
+            throws ServiceError, IOException, InterruptedException, IEC61850MissconfiguredException {
 
         final Instant testExecutionStart = now().plus(ofSeconds(10));
         final Instant schedulesStart = testExecutionStart.plus(ofSeconds(4));
 
         //schedule 5, start after 2s, duration 12s, Prio 40
-        dut.writeAndEnableSchedule(Arrays.asList(10, 10, 10, 10, 10, 10), ofSeconds(4),
-                scheduleConstants.getScheduleName(5), schedulesStart, 40);
+        dut.writeAndEnableSchedule(scheduleConstants.getValueAccess()
+                        .prepareWriting(Arrays.asList(10, 10, 10, 10, 10, 10), scheduleConstants.getScheduleName(5)),
+                ofSeconds(4), schedulesStart, 40);
         //schedule 1, start after 4s, duration 4s, Prio 40
-        dut.writeAndEnableSchedule(Arrays.asList(70, 100), ofSeconds(4), scheduleConstants.getScheduleName(1),
+        dut.writeAndEnableSchedule(scheduleConstants.getValueAccess()
+                        .prepareWriting(Arrays.asList(70, 100), scheduleConstants.getScheduleName(1)), ofSeconds(4),
                 schedulesStart.plus(ofSeconds(4)), 40);
         //schedule 2, start after 8s, duration 4s, Prio 40
-        dut.writeAndEnableSchedule(Arrays.asList(70, 70), ofSeconds(4), scheduleConstants.getScheduleName(2),
+        dut.writeAndEnableSchedule(scheduleConstants.getValueAccess()
+                        .prepareWriting(Arrays.asList(70, 70), scheduleConstants.getScheduleName(2)), ofSeconds(4),
                 schedulesStart.plus(ofSeconds(12)), 40);
         //schedule 3, start after 14s, duration 2s, Prio 60
-        dut.writeAndEnableSchedule(Arrays.asList(100), ofSeconds(4), scheduleConstants.getScheduleName(3),
+        dut.writeAndEnableSchedule(scheduleConstants.getValueAccess()
+                        .prepareWriting(Arrays.asList(100), scheduleConstants.getScheduleName(3)), ofSeconds(4),
                 schedulesStart.plus(ofSeconds(24)), 60);
 
-        List<Float> expectedValues = Arrays.asList(0f, 10f, 70f, 100f, 70f, 70f, 10f, 100f, 0f);
+        float sysResValue = (float) dut.readConstantPowerFromSysResScheduleFromModelNode(
+                scheduleConstants.getValueAccess(), scheduleConstants.getReserveSchedule());
+        List<Float> expectedValues = Arrays.asList(sysResValue, 10f, 70f, 100f, 70f, 70f, 10f, 100f, sysResValue);
 
         Instant monitoringStart = testExecutionStart.plus(ofSeconds(2));
         List<Float> actualValues = dut.monitor(monitoringStart, ofSeconds(36), ofSeconds(4), scheduleConstants);
@@ -231,7 +182,7 @@ public class ScheduleExecutionTest extends AllianderBaseTest {
     }
 
     @ParameterizedTest(name = "samePriorityAndStart running {0}")
-    @MethodSource("getScheduleTypes")
+    @MethodSource("getPowerValueSchedules")
     public void samePriorityAndStart(ScheduleConstants scheduleConstants)
             throws ServiceError, IOException, InterruptedException {
         //test of schedules with same prio and same start
@@ -241,12 +192,14 @@ public class ScheduleExecutionTest extends AllianderBaseTest {
         final Instant schedulesStart = testExcecutionStart.plus(ofSeconds(4));
 
         //Schedule 1, start after 2s, duration 8s, Prio 50
-        dut.writeAndEnableSchedule(Arrays.asList(10, 10, 10, 10), ofSeconds(4), scheduleConstants.getScheduleName(1),
+        dut.writeAndEnableSchedule(scheduleConstants.getValueAccess()
+                        .prepareWriting(Arrays.asList(10, 10, 10, 10), scheduleConstants.getScheduleName(1)), ofSeconds(4),
                 schedulesStart, 50);
 
         //Schedule 2, start after 2sec, duration 10s, Prio 50
-        dut.writeAndEnableSchedule(Arrays.asList(40, 40, 40, 40, 40), ofSeconds(4),
-                scheduleConstants.getScheduleName(2), schedulesStart, 50);
+        dut.writeAndEnableSchedule(scheduleConstants.getValueAccess()
+                        .prepareWriting(Arrays.asList(40, 40, 40, 40, 40), scheduleConstants.getScheduleName(2)), ofSeconds(4),
+                schedulesStart, 50);
 
         List<Float> actualValues = dut.monitor(testExcecutionStart.plus(ofSeconds(4)), ofSeconds(20), ofSeconds(2),
                 scheduleConstants);
@@ -256,7 +209,7 @@ public class ScheduleExecutionTest extends AllianderBaseTest {
             dut.disableSchedule(scheduleConstants.getScheduleName(i));
         }
 
-        // TODO: use some actual asserts after expected behaviour has been clarified with MZ
+        // TODO: use some actual asserts after expected behaviour has been clarified with MZ (seems like not defined in 61850-90-10)
     }
 
 }
