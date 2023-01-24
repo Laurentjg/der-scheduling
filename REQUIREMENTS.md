@@ -31,11 +31,11 @@ Basic schedule funtionality shall be supported, as depicted below:
 
 [LN02]: The control functions of the DER are modeled and implemented independently
 
-[LN02-a]: Absolute active power is controlled in 10 logical nodes ActPow_FSCH01 .. ActPow_FSCH10, with schedule controller ActPow_FSCC and actuator interface ActPow_GGIO
+[LN02-a]: Absolute active power is controlled in 10 logical nodes ActPow_FSCH01 .. ActPow_FSCH10, with schedule controller ActPow_FSCC1 and actuator interface ActPow_GGIO1
 
-[LN02-b]: Maximum power is controlled in 10 logical nodes WGn_FSCH01 .. WGn_FSCH10, with schedule controller WGn_FSCC and actuator interface WGn_GGIO
+[LN02-b]: Maximum power is controlled in 10 logical nodes MaxPow_FSCH01 .. MaxPow_FSCH10, with schedule controller MaxPow_FSCC1 and actuator interface MaxPow_GGIO1
 
-[LN02-c]: On/Off state of the DER is controlled in 10 logical nodes for the schedules, with schedule controller and an actuator interface. The names are to be defined.
+[LN02-c]: On/Off state of the DER is controlled 10 logical nodes OnOff_FSCH01 .. OnOff_FSCH10, with schedule controller OnOff_FSCC1 and actuator interface OnOff_GGIO1
 
 [LN03]: The scheduling nodes and their children are to be modeled according to 61850-90-10 
 
