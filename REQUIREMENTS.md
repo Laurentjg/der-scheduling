@@ -35,7 +35,7 @@ Basic schedule funtionality shall be supported, as depicted below:
 
 [LN02-b]: Maximum power is controlled in 10 logical nodes WGn_FSCH01 .. WGn_FSCH10, with schedule controller WGn_FSCC and actuator interface WGn_GGIO
 
-[LN02-b]: On/Off state of the DER is controlled in 10 logical nodes for the schedules, with schedule controller and an actuator interface. The names are to be defined.
+[LN02-c]: On/Off state of the DER is controlled in 10 logical nodes for the schedules, with schedule controller and an actuator interface. The names are to be defined.
 
 [LN03]: The scheduling nodes and their children are to be modeled according to 61850-90-10 
 
@@ -73,6 +73,8 @@ Basic schedule funtionality shall be supported, as depicted below:
 [S15]: Reserve Schedules have a fixed start date of 01.01.1970 00:00:01 (UTC). This cannot be changed.
 
 [S16]: Reserve Schedules are set to cyclic execution. This cannot be changed.
+
+[S17]: If two schedules are configured with the same pirority and start time, the schedule that comes first in the schedule controller's schedule reference is executed.
 
 # Schedule execution
 [E01]: Execution of schedules must regard schedule priority according to 61850-10
