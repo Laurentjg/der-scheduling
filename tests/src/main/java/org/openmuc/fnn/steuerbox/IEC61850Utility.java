@@ -21,7 +21,12 @@ import com.beanit.iec61850bean.ModelNode;
 import com.beanit.iec61850bean.ServerModel;
 import com.beanit.iec61850bean.ServiceError;
 import org.apache.commons.io.IOUtils;
-import org.openmuc.fnn.steuerbox.models.ScheduleConstants;
+import org.openmuc.fnn.steuerbox.scheduling.PreparedSchedule;
+import org.openmuc.fnn.steuerbox.scheduling.PreparedSchedule.PreparedScheduleValues;
+import org.openmuc.fnn.steuerbox.scheduling.ScheduleDefinitions;
+import org.openmuc.fnn.steuerbox.scheduling.ScheduleEnablingErrorKind;
+import org.openmuc.fnn.steuerbox.scheduling.ScheduleState;
+import org.openmuc.fnn.steuerbox.scheduling.ValueAccess;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
@@ -35,11 +40,10 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.nio.charset.Charset;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
@@ -55,7 +59,28 @@ public class IEC61850Utility implements Closeable {
     private final ClientAssociation association;
     private final ServerModel serverModel;
 
-    protected IEC61850Utility(String host, int port) throws IOException, ServiceError {
+    public ScheduleEnablingErrorKind getSchdEnaErr(String scheduleName) throws ServiceError, IOException {
+        BasicDataAttribute errorKind = (BasicDataAttribute) serverModel.findModelNode(
+                scheduleName + ".SchdEnaErr.stVal", null);
+        association.getDataValues((FcModelNode) errorKind);
+        return ScheduleEnablingErrorKind.parse(errorKind.getValueString());
+    }
+
+    public ScheduleState getScheduleState(String scheduleName) throws ServiceError, IOException {
+        BasicDataAttribute state = (BasicDataAttribute) serverModel.findModelNode(scheduleName + ".SchdSt.stVal", null);
+        association.getDataValues((FcModelNode) state);
+        return ScheduleState.parse(state.getValueString());
+    }
+
+    public String getNodeEntryasString(String scheduleName, String specificNode, String dataType)
+            throws ServiceError, IOException {
+        BasicDataAttribute nodeEntry = (BasicDataAttribute) serverModel.findModelNode(
+                scheduleName + "." + specificNode + "." + dataType, null);
+        association.getDataValues((FcModelNode) nodeEntry);
+        return nodeEntry.getValueString();
+    }
+
+    protected IEC61850Utility(String host, int port) throws UnknownHostException, IOException, ServiceError {
         this(InetAddress.getByName(host), port);
     }
 
@@ -129,7 +154,7 @@ public class IEC61850Utility implements Closeable {
      * Reads the reserve schedule from the IED Node and returns the constant power. Throws {@link
      * IEC61850MissconfiguredException} if the reserve schedule is set up to hold more than one value
      */
-    public <T> T readConstantPowerFromSysResScheduleFromModelNode(ValueAccess<T> valueAccess,
+    public <T> T readConstantValueFromSysResScheduleFromModelNode(ValueAccess<T> valueAccess,
             String reserveScheduleName) throws ServiceError, IOException, IEC61850MissconfiguredException {
 
         // read Number of Entrys
@@ -175,123 +200,11 @@ public class IEC61850Utility implements Closeable {
         return buffer.toString();
     }
 
-    public interface ValueWriter {
-        void write() throws ServiceError, IOException;
-
-        int size();
-
-        String getScheduleName();
+    public void writeAndEnableSchedule(PreparedSchedule preparedSchedule) throws ServiceError, IOException {
+        preparedSchedule.writeAndEnable(this);
     }
 
-    // TODO: create something like schedule access and use that in tests (writing / reading schedules is too complex now!)
-    public interface ValueAccess<T> {
-
-        String getValueAccessString(int valueIndex, String scheduleName);
-
-        ValueWriter prepareWriting(Collection<T> values, String scheduleName);
-
-        default ValueWriter prepareWriting(T singleValue, String scheduleName) {
-            return prepareWriting(Arrays.asList(singleValue), scheduleName);
-        }
-
-        /**
-         * Write a default value to this schedule. Useful if several types of schedules are to be processed.
-         */
-        ValueWriter activateScheduleWithDefaultValue(String scheduleName);
-
-        T readToTargetValue(FcModelNode node) throws ServiceError, IOException;
-    }
-
-    public static ValueAccess<? extends Number> asgAccess(IEC61850Utility utility) {
-        return new ValueAccess<>() {
-            @Override
-            public String getValueAccessString(int valueIndex, String scheduleName) {
-                return String.format("%s.ValASG%03d.setMag.f", scheduleName, valueIndex);
-            }
-
-            @Override
-            public ValueWriter prepareWriting(Collection<Number> values, String scheduleName) {
-                return new ValueWriter() {
-                    @Override
-                    public void write() throws ServiceError, IOException {
-                        int index = 1;
-                        for (Number value : values) {
-                            String valueBasicDataAttribute = getValueAccessString(index++, scheduleName);
-                            log.debug("Writing {} to {}", value, valueBasicDataAttribute);
-                            utility.setDataValues(valueBasicDataAttribute, null, value.toString());
-                        }
-                    }
-
-                    @Override
-                    public int size() {
-                        return values.size();
-                    }
-
-                    @Override
-                    public String getScheduleName() {
-                        return scheduleName;
-                    }
-                };
-            }
-
-            @Override
-            public ValueWriter activateScheduleWithDefaultValue(String scheduleName) {
-                return prepareWriting(Arrays.asList(0), scheduleName);
-            }
-
-            @Override
-            public Number readToTargetValue(FcModelNode node) throws ServiceError, IOException {
-                return ((BdaFloat32) node).getFloat();
-            }
-
-        };
-    }
-
-    public static ValueAccess<Boolean> spgAccess(IEC61850Utility utility) {
-        return new ValueAccess<>() {
-            @Override
-            public String getValueAccessString(int valueIndex, String scheduleName) {
-                return String.format("%s.ValSPG%03d.setVal", scheduleName, valueIndex);
-            }
-
-            @Override
-            public ValueWriter prepareWriting(Collection<Boolean> values, String scheduleName) {
-                return new ValueWriter() {
-                    @Override
-                    public void write() throws ServiceError, IOException {
-                        int index = 1;
-                        for (Boolean value : values) {
-                            String valueBasicDataAttribute = getValueAccessString(index++, scheduleName);
-                            log.debug("Writing {} to {}", value, valueBasicDataAttribute);
-                            utility.setDataValues(valueBasicDataAttribute, null, value.toString());
-                        }
-                    }
-
-                    @Override
-                    public int size() {
-                        return values.size();
-                    }
-
-                    @Override
-                    public String getScheduleName() {
-                        return scheduleName;
-                    }
-                };
-            }
-
-            @Override
-            public ValueWriter activateScheduleWithDefaultValue(String scheduleName) {
-                return prepareWriting(Arrays.asList(false), scheduleName);
-            }
-
-            @Override
-            public Boolean readToTargetValue(FcModelNode node) throws ServiceError, IOException {
-                return ((BdaBoolean) node).getValue();
-            }
-        };
-    }
-
-    public void writeAndEnableSchedule(ValueWriter values, Duration interval, Instant start, int prio)
+    public void writeAndEnableSchedule(PreparedScheduleValues values, Duration interval, Instant start, int prio)
             throws ServiceError, IOException {
 
         String scheduleName = writeScheduleValues(values);
@@ -302,27 +215,51 @@ public class IEC61850Utility implements Closeable {
             throw new IllegalArgumentException("interval must be larger than one second");
         }
 
-        log.info("setting {} start to {}", scheduleName, start);
-        setDataValues(scheduleName + ".StrTm01.setTm", null, Long.toString(start.toEpochMilli()));
         setDataValues(scheduleName + ".SchdIntv.setVal", null, intervalInSeconds.toString());
-        setDataValues(scheduleName + ".SchdPrio.setVal", null, Long.toString(prio));
+        setSchedulePrio(scheduleName, prio);
 
+        setScheduleStart(scheduleName, start);
         BasicDataAttribute disableOp = findAndAssignValue(scheduleName + ".DsaReq.Oper.ctlVal", Fc.CO, "false");
         BasicDataAttribute enableOp = findAndAssignValue(scheduleName + ".EnaReq.Oper.ctlVal", Fc.CO, "true");
 
         operate((FcModelNode) disableOp.getParent().getParent());
         operate((FcModelNode) enableOp.getParent().getParent());
-
     }
 
-    public String writeScheduleValues(ValueWriter values) throws ServiceError, IOException {
+    public void setScheduleStart(String scheduleName, Instant start) throws ServiceError, IOException {
+        log.info("setting {} start to {}", scheduleName, start);
+        setDataValues(scheduleName + ".StrTm01.setTm", null, Long.toString(start.toEpochMilli()));
+    }
+
+    public Instant getScheduleStart(String scheduleName) throws ServiceError, IOException {
+        BasicDataAttribute schedulePrio = (BasicDataAttribute) serverModel.findModelNode(
+                scheduleName + ".StrTm01.setTm", null);
+        association.getDataValues(schedulePrio);
+        return Instant.parse(schedulePrio.getValueString());
+    }
+
+    public void setSchedulePrio(String scheduleName, int prio) throws ServiceError, IOException {
+        setDataValues(scheduleName + ".SchdPrio.setVal", null, Long.toString(prio));
+    }
+
+    public int readSchedulePrio(String scheduleName) throws ServiceError, IOException {
+        BasicDataAttribute schedulePrio = (BasicDataAttribute) serverModel.findModelNode(
+                scheduleName + ".SchdPrio.setVal", null);
+        association.getDataValues(schedulePrio);
+        return Integer.valueOf(schedulePrio.getValueString());
+    }
+
+    /**
+     * Writes a previously specified Schedule to the device.
+     */
+    public String writeScheduleValues(PreparedScheduleValues values) throws ServiceError, IOException {
         String scheduleName = values.getScheduleName();
 
         if (values.size() < 1) {
             throw new IllegalArgumentException("At least one value required.");
         }
 
-        values.write();
+        values.writeValues();
 
         setDataValues(scheduleName + ".NumEntr.setVal", null, String.valueOf(values.size()));
         return scheduleName;
@@ -346,12 +283,14 @@ public class IEC61850Utility implements Closeable {
     /**
      * Reads the main power, that should be controlled by our schedule
      */
-    public float readAnalogOutFromGGIO(String controlledEntitiy) throws ServiceError, IOException {
-        BdaFloat32 activePower = (BdaFloat32) serverModel.findModelNode(controlledEntitiy + ".AnOut1.mxVal.f", null);
-        association.getDataValues((FcModelNode) activePower);
-        float mainPowerValue = activePower.getFloat();
-        log.debug("Got output value {} at {} UTC", mainPowerValue, Instant.now());
-        return mainPowerValue;
+    public <T> T readGGIOOutput(ScheduleDefinitions constants) throws ServiceError, IOException {
+        String valueNodeName = constants.getGGIOValueReference();
+        ModelNode ggioValue = serverModel.findModelNode(valueNodeName, null);
+        association.getDataValues((FcModelNode) ggioValue);
+        ValueAccess<T> valueAccess = constants.getValueAccess();
+        T monitoredValue = valueAccess.readToTargetValue((FcModelNode) ggioValue);
+        log.trace("Got output value '{}' at {} UTC", monitoredValue, Instant.now());
+        return monitoredValue;
     }
 
     /**
@@ -360,8 +299,8 @@ public class IEC61850Utility implements Closeable {
      * <p>
      * The result list contains a list of polled values. The first value is the polled value at the start.
      */
-    public List<Float> monitor(Instant start, Duration monitoringDuration, Duration monitoringInterval,
-            ScheduleConstants constants) throws InterruptedException {
+    public <T> List<T> monitor(Instant start, Duration monitoringDuration, Duration monitoringInterval,
+            ScheduleDefinitions constants) throws InterruptedException {
 
         log.info("setting up monitoring");
         if (monitoringDuration.minus(Duration.ofSeconds(1)).isNegative()) {
@@ -376,13 +315,13 @@ public class IEC61850Utility implements Closeable {
 
         ScheduledExecutorService service = new ScheduledThreadPoolExecutor(1);
 
-        List<Float> monitoredValues = new LinkedList<>();
+        List<T> monitoredValues = new LinkedList<>();
         Runnable monitoringTask = () -> {
             try {
                 if (counter.getAndDecrement() > 0) {
-                    float value = readAnalogOutFromGGIO(constants.getControlledGGIO());
-                    log.debug("Read value {} from {}", value, constants.getControlledGGIO());
-                    monitoredValues.add(value);
+                    T monitoredValue = readGGIOOutput(constants);
+                    log.debug("Read value '{}' from {}", monitoredValue, constants.getControlledGGIO());
+                    monitoredValues.add(monitoredValue);
                 }
                 else {
                     service.shutdown();
@@ -401,7 +340,7 @@ public class IEC61850Utility implements Closeable {
         return monitoredValues;
     }
 
-    protected BasicDataAttribute setDataValues(String objectReference, Fc fc, String value)
+    public BasicDataAttribute setDataValues(String objectReference, Fc fc, String value)
             throws ServiceError, IOException {
         log.debug("Setting {} to {}", objectReference, value);
         BasicDataAttribute bda = findAndAssignValue(objectReference, fc, value);
@@ -483,12 +422,6 @@ public class IEC61850Utility implements Closeable {
         }
     }
 
-    public boolean isTimeSet() {
-        // TODO: actually check in test device, otherwise scheduling tests will all fail!
-        log.warn("MAKE SURE THAT THE DATE/TIME IS SET PROPERLY; OTHERWISE THESE TESTS WILL NOT WORK");
-        return true;
-    }
-
     public ServerModel getCachedServerModel() {
         return serverModel;
     }
@@ -519,4 +452,5 @@ public class IEC61850Utility implements Closeable {
     public ModelNode getNode(String nodeName) {
         return serverModel.findModelNode(nodeName, null);
     }
+
 }

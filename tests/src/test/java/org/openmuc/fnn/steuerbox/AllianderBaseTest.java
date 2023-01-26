@@ -10,9 +10,8 @@ import org.assertj.core.data.Percentage;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.openmuc.fnn.steuerbox.models.AllianderDER;
-import org.openmuc.fnn.steuerbox.models.Requirements;
-import org.openmuc.fnn.steuerbox.models.ScheduleConstants;
-import org.openmuc.fnn.steuerbox.models.ScheduleConstants.ScheduleType;
+import org.openmuc.fnn.steuerbox.scheduling.ScheduleDefinitions;
+import org.openmuc.fnn.steuerbox.scheduling.ScheduleType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +32,6 @@ public abstract class AllianderBaseTest {
 
     private static final Logger logger = LoggerFactory.getLogger(ScheduleNodeTests.class);
 
-    // TODO: dut should only be required to init schedule access, that should be designed to have a better interface than the IEC61850Utility!
     protected static AllianderDER dut;
 
     @BeforeAll
@@ -65,30 +63,36 @@ public abstract class AllianderBaseTest {
     /**
      * These schedules use float values for scheduling
      */
-    protected static Stream<ScheduleConstants> getPowerValueSchedules() {
+    protected static Stream<ScheduleDefinitions<?>> getPowerValueSchedules() {
         return getAllSchedules().filter(s -> ScheduleType.ASG == s.getScheduleType());
     }
 
     /**
      * These schedules use boolean values for scheduling
      */
-    private static Stream<ScheduleConstants> getOnOffSchedules() {
+    protected static Stream<ScheduleDefinitions<?>> getOnOffSchedules() {
         return getAllSchedules().filter(s -> ScheduleType.SPG == s.getScheduleType());
     }
 
-    protected static Stream<ScheduleConstants> getAllSchedules() {
+    protected static Stream<ScheduleDefinitions<?>> getAllSchedules() {
         return Stream.of(dut.powerSchedules, dut.maxPowerSchedules, dut.onOffSchedules);
     }
 
-    /**
-     * {@link Requirements#S08}
-     */
     public static void assertValuesMatch(List<Float> expectedValues, List<Float> actualValues, double withPercentage) {
         Assertions.assertThat(actualValues).hasSameSizeAs(expectedValues);
         for (int i = 0; i < expectedValues.size(); i++) {
             Float expected = expectedValues.get(i);
             Float actual = actualValues.get(i);
             Assertions.assertThat(actual).isCloseTo(expected, Percentage.withPercentage(withPercentage));
+        }
+    }
+
+    public static void assertValuesMatch(List<Boolean> expectedValues, List<Boolean> actualValues) {
+        Assertions.assertThat(actualValues).hasSameSizeAs(expectedValues);
+        for (int i = 0; i < expectedValues.size(); i++) {
+            boolean expected = expectedValues.get(i);
+            boolean actual = actualValues.get(i);
+            Assertions.assertThat(actual).isEqualTo(expected);
         }
     }
 

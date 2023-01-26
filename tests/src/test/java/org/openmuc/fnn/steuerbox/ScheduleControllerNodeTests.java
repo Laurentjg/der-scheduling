@@ -2,10 +2,10 @@ package org.openmuc.fnn.steuerbox;
 
 import com.beanit.iec61850bean.Fc;
 import com.beanit.iec61850bean.ServiceError;
-import org.junit.jupiter.api.Disabled;
+import de.fhg.ise.testtool.utils.annotations.label.Requirements;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.openmuc.fnn.steuerbox.models.ScheduleConstants;
+import org.openmuc.fnn.steuerbox.scheduling.ScheduleDefinitions;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -17,6 +17,13 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.openmuc.fnn.steuerbox.models.Requirement.E01;
+import static org.openmuc.fnn.steuerbox.models.Requirement.LN01;
+import static org.openmuc.fnn.steuerbox.models.Requirement.LN02;
+import static org.openmuc.fnn.steuerbox.models.Requirement.LN02a;
+import static org.openmuc.fnn.steuerbox.models.Requirement.LN02b;
+import static org.openmuc.fnn.steuerbox.models.Requirement.LN02c;
+import static org.openmuc.fnn.steuerbox.models.Requirement.LN03;
 
 /**
  * Holds tests related to 61850 schedule controller node behaviour
@@ -27,9 +34,10 @@ public class ScheduleControllerNodeTests extends AllianderBaseTest {
      * Test if the scheduler has the required nodes with correct types as defined in IEC 61850-90-10:2017, table 6 (page
      * 25)
      **/
+    @Requirements({ LN03, LN01, LN02 })
     @ParameterizedTest(name = "checkSubnodes running {0}")
     @MethodSource("getAllSchedules")
-    void checkSubnodes(ScheduleConstants scheduleConstants) {
+    void checkSubnodes(ScheduleDefinitions scheduleConstants) {
 
         // relevant part of the table is the "non-derived-statistics" (nds) column
 
@@ -96,12 +104,12 @@ public class ScheduleControllerNodeTests extends AllianderBaseTest {
     /**
      * {@ link Requirements#LN02a}
      */
-    // TODO MZ: active controller is not updated in schedule controller as specified
-    @Disabled    // TODO: enable test before merging
+    @Requirements({ LN03, LN02a, LN02b, LN02c })
     @ParameterizedTest(name = "activeControllerIsUpdated running {0}")
     @MethodSource("getAllSchedules")
-    void activeControllerIsUpdated(ScheduleConstants scheduleConstants)
+    void activeControllerIsUpdated(ScheduleDefinitions scheduleConstants)
             throws ServiceError, IOException, InterruptedException {
+
         //initial state: no schedule active -> reserve schedule is working
         //test, that ActSchdRef contains a reference of the reserve schedule
 
@@ -110,30 +118,29 @@ public class ScheduleControllerNodeTests extends AllianderBaseTest {
 
         String schedule = scheduleConstants.getScheduleName(1);
         //write and activate a schedule with a higher priority than the reserve schedule
-        Instant scheduleStart = Instant.now().plus(Duration.ofSeconds(2));
+        Instant scheduleStart = Instant.now().plus(Duration.ofSeconds(1));
         dut.writeAndEnableSchedule(scheduleConstants.getValueAccess().activateScheduleWithDefaultValue(schedule),
                 Duration.ofSeconds(2), scheduleStart, 100);
 
-        // waiting shortly, why so long??
-        Thread.sleep(6000);
+        while (Instant.now().isBefore(scheduleStart.plus(Duration.ofMillis(200)))) {
+            Thread.sleep(200);
+        }
 
         //test, that ActSchdRef contains a reference of the active schedule
         assertEquals(schedule, "FNN_STEUERBOX" + dut.readActiveSchedule(scheduleConstants.getController()));
 
         // wait until the active schedule finished service
-        Thread.sleep(5000);
+        Thread.sleep(2000);
 
         //make sure the reserve schedule is active again
         assertEquals(scheduleConstants.getReserveSchedule(), dut.readActiveSchedule(scheduleConstants.getController()),
                 "Did not return to system reserve schedule after execution time");
     }
 
-    /**
-     * {@ link Requirements#LN02a}
-     */
+    @Requirements({ LN03, E01 })
     @ParameterizedTest(name = "activeControllerIsUpdatedWithScheduleOfHighestPrio running {0}")
     @MethodSource("getAllSchedules")
-    void activeControllerIsUpdatedWithScheduleOfHighestPrio(ScheduleConstants scheduleConstants)
+    void activeControllerIsUpdatedWithScheduleOfHighestPrio(ScheduleDefinitions scheduleConstants)
             throws ServiceError, IOException, InterruptedException {
 
         //  assertEquals(scheduleConstants.getReserveSchedule(), dut.readActiveSchedule(scheduleConstants.getController()),
@@ -159,7 +166,6 @@ public class ScheduleControllerNodeTests extends AllianderBaseTest {
         Thread.sleep(1_000);
         assertEquals(dut.readActiveSchedule(scheduleConstants.getController()), schedule2Name);
 
-        Thread.sleep(1000); // FIXME: is this really necessary?
+        Thread.sleep(1000);
     }
-
 }

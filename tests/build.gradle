@@ -6,13 +6,10 @@
 plugins {
     id 'java-library'
 }
-
 repositories {
     jcenter()
     mavenCentral()
 }
-
-
 dependencies {
     implementation 'ch.qos.logback:logback-classic:1.2.11'
     implementation group: 'org.slf4j', name: 'slf4j-api', version: '1.7.36'
@@ -27,6 +24,17 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter-params:5.3.1'
     // https://mvnrepository.com/artifact/org.assertj/assertj-core
     testImplementation group: 'org.assertj', name: 'assertj-core', version: '3.20.2'
+}
+
+jar {
+    manifest {
+        attributes(
+                'Main-Class': 'org.openmuc.fnn.steuerbox.ScheduleWriterExample'
+        )
+    }
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
 }
 
 test {

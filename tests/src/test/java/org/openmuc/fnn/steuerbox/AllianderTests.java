@@ -1,17 +1,27 @@
 package org.openmuc.fnn.steuerbox;
 
-import com.beanit.iec61850bean.ServiceError;
+import de.fhg.ise.testtool.utils.annotations.label.Requirements;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.openmuc.fnn.steuerbox.models.Requirements;
-import org.openmuc.fnn.steuerbox.models.ScheduleConstants;
+import org.openmuc.fnn.steuerbox.scheduling.ScheduleDefinitions;
+import org.openmuc.fnn.steuerbox.scheduling.ScheduleType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
+import static org.openmuc.fnn.steuerbox.models.Requirement.LN02a;
+import static org.openmuc.fnn.steuerbox.models.Requirement.LN02b;
+import static org.openmuc.fnn.steuerbox.models.Requirement.LN02c;
+import static org.openmuc.fnn.steuerbox.models.Requirement.S01;
+import static org.openmuc.fnn.steuerbox.models.Requirement.S02;
+import static org.openmuc.fnn.steuerbox.models.Requirement.S04;
+import static org.openmuc.fnn.steuerbox.models.Requirement.S05a;
+import static org.openmuc.fnn.steuerbox.models.Requirement.S05b;
+import static org.openmuc.fnn.steuerbox.models.Requirement.S05c;
+import static org.openmuc.fnn.steuerbox.models.Requirement.S10;
+import static org.openmuc.fnn.steuerbox.models.Requirement.S11;
+import static org.openmuc.fnn.steuerbox.models.Requirement.S12;
 
 /**
  * Tests suiting the requirements in https://github.com/alliander-opensource/der-scheduling/blob/main/REQUIREMENTS.md
@@ -25,26 +35,10 @@ public class AllianderTests extends AllianderBaseTest {
 
     private static final Logger log = LoggerFactory.getLogger(AllianderTests.class);
 
-    /**
-     * @throws ServiceError
-     * @throws IOException
-     *         {@link org.openmuc.fnn.steuerbox.models.Requirements#C01a}
-     */
-    // TODO: clearify with MZ/Alliander if this requirement is actually needed; then update + enable test
-    @Disabled
-    @Test
-    void requirement_C01_a_activePowerReserveSchedule() throws ServiceError, IOException {
-        String sclFileName = "config.xml";
-        String sclFile = dut.readFileVia61850(sclFileName, 10_000);
-
-        // TODO: checks, implement once the format is fixed
-        // has 100 values
-        // ...
-    }
-
+    @Requirements(S01)
     @ParameterizedTest(name = "tenSchedulesAreSupportedPerType running {0}")
     @MethodSource("getAllSchedules")
-    void tenSchedulesAreSupportedPerType(ScheduleConstants scheduleConstants) {
+    void tenSchedulesAreSupportedPerType(ScheduleDefinitions<?> scheduleConstants) {
         int j = 0;
         for (String scheduleName : scheduleConstants.getAllScheduleNames()) {
             boolean ScheduleExistsOrNot = dut.nodeExists(scheduleName);
@@ -55,30 +49,40 @@ public class AllianderTests extends AllianderBaseTest {
         log.info("There are {} existing schedules at this logical node", j);
     }
 
-    /**
-     * Covers {@link Requirements#S10}
-     */
+    @Requirements(S10)
     @ParameterizedTest(name = "scheduleSupports100values running {0}")
     @MethodSource("getAllSchedules")
-    void scheduleSupports100values(ScheduleConstants scheduleConstants) {
+    void scheduleSupports100values(ScheduleDefinitions<?> scheduleConstants) {
         for (String scheduleName : scheduleConstants.getAllScheduleNames()) {
-            String valNodeName;
-            if (scheduleConstants.getScheduleType() == ScheduleConstants.ScheduleType.SPG)
-                valNodeName = ".ValSPG";
-            else
-                valNodeName = ".ValASG";
-            for (int i = 1; i <= 100; i++) {
-                String numberAsStringFilledUpWithZeros = String.format("%03d", i);
-                String valueConfigurationNode = scheduleName + valNodeName + numberAsStringFilledUpWithZeros;
-                boolean valueExists = dut.nodeExists(valueConfigurationNode);
-                Assertions.assertTrue(valueExists, "Missing node " + valueConfigurationNode);
-            }
+            assert100ScheduleValuesAreSupported(scheduleConstants, scheduleName);
         }
     }
 
+    @Requirements(S12)
+    @ParameterizedTest(name = "reserveScheduleSupports100values running {0}")
+    @MethodSource("getAllSchedules")
+    void reserveScheduleSupports100values(ScheduleDefinitions<?> scheduleConstants) {
+        assert100ScheduleValuesAreSupported(scheduleConstants, scheduleConstants.getReserveSchedule());
+    }
+
+    private void assert100ScheduleValuesAreSupported(ScheduleDefinitions<?> scheduleConstants, String scheduleName) {
+        final String valNodeName;
+        if (scheduleConstants.getScheduleType() == ScheduleType.SPG)
+            valNodeName = ".ValSPG";
+        else
+            valNodeName = ".ValASG";
+        for (int i = 1; i <= 100; i++) {
+            String numberAsStringFilledUpWithZeros = String.format("%03d", i);
+            String valueConfigurationNode = scheduleName + valNodeName + numberAsStringFilledUpWithZeros;
+            boolean valueExists = dut.nodeExists(valueConfigurationNode);
+            Assertions.assertTrue(valueExists, "Missing node " + valueConfigurationNode);
+        }
+    }
+
+    @Requirements(S02)
     @ParameterizedTest(name = "scheduleSupportsTimebasedScheduling running {0}")
     @MethodSource("getAllSchedules")
-    void scheduleSupportsTimebasedScheduling(ScheduleConstants scheduleConstants) {
+    void scheduleSupportsTimebasedScheduling(ScheduleDefinitions scheduleConstants) {
         for (int i = 1; i <= 10; i++) {
             String aTimerNode = scheduleConstants.getScheduleName(i) + ".StrTm01";
             Assertions.assertTrue(dut.nodeExists(aTimerNode),
@@ -86,13 +90,54 @@ public class AllianderTests extends AllianderBaseTest {
         }
     }
 
+    @Requirements({ LN02a, LN02b, LN02c })
     @ParameterizedTest(name = "allExpectedSchedulesExist running {0}")
     @MethodSource("getAllSchedules")
-    void allExpectedSchedulesExist(ScheduleConstants scheduleConstants) {
+    void allExpectedSchedulesExist(ScheduleDefinitions<?> scheduleConstants) {
         for (String scheduleName : scheduleConstants.getAllScheduleNames()) {
             org.assertj.core.api.Assertions.assertThat(dut.nodeExists(scheduleName))
                     .describedAs("Expected schedule " + scheduleName + " to exist but did not find it")
                     .isTrue();
         }
     }
+
+    @Requirements(S04)
+    @ParameterizedTest(name = "reserveSchedulesExist running {0}")
+    @MethodSource("getAllSchedules")
+    void reserveSchedulesExist(ScheduleDefinitions scheduleConstants) {
+        Assertions.assertTrue(dut.nodeExists(scheduleConstants.getReserveSchedule()));
+    }
+
+    @Requirements(S05a)
+    @Test
+    void absolutePowerValueSchedulesAreSupported() {
+        for (String absolutePowerValueSchedule : dut.powerSchedules.getAllScheduleNames()) {
+            Assertions.assertTrue(dut.nodeExists(absolutePowerValueSchedule));
+        }
+    }
+
+    @Requirements(S05b)
+    @Test
+    void maxPowerValueSchedulesAreSupported() {
+        for (String absolutePowerValueSchedule : dut.maxPowerSchedules.getAllScheduleNames()) {
+            Assertions.assertTrue(dut.nodeExists(absolutePowerValueSchedule));
+        }
+    }
+
+    @Requirements(S05c)
+    @Test
+    void onOffSchedulesAreSupported() {
+        for (String absolutePowerValueSchedule : dut.onOffSchedules.getAllScheduleNames()) {
+            Assertions.assertTrue(dut.nodeExists(absolutePowerValueSchedule));
+        }
+    }
+
+    @Test
+    @Requirements(S11)
+    void threeReserveSchedulesExist() {
+        Assertions.assertTrue(dut.nodeExists(dut.onOffSchedules.getReserveSchedule()));
+        Assertions.assertTrue(dut.nodeExists(dut.maxPowerSchedules.getReserveSchedule()));
+        Assertions.assertTrue(dut.nodeExists(dut.powerSchedules.getReserveSchedule()));
+    }
+
 }

@@ -1,19 +1,41 @@
 package org.openmuc.fnn.steuerbox;
 
+import com.beanit.iec61850bean.BasicDataAttribute;
 import com.beanit.iec61850bean.Fc;
-import org.junit.jupiter.api.Disabled;
+import com.beanit.iec61850bean.FcModelNode;
+import com.beanit.iec61850bean.ServiceError;
+import de.fhg.ise.testtool.utils.annotations.label.Requirements;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.openmuc.fnn.steuerbox.models.ScheduleConstants;
+import org.openmuc.fnn.steuerbox.scheduling.PreparedSchedule;
+import org.openmuc.fnn.steuerbox.scheduling.ScheduleDefinitions;
+import org.openmuc.fnn.steuerbox.scheduling.ScheduleEnablingErrorKind;
+import org.openmuc.fnn.steuerbox.scheduling.ScheduleState;
+import org.openmuc.fnn.steuerbox.scheduling.ScheduleType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 
+import static java.time.Duration.ofSeconds;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openmuc.fnn.steuerbox.AllianderBaseTest.MandatoryOnCondition.ifPresent;
+import static org.openmuc.fnn.steuerbox.models.Requirement.LN01;
+import static org.openmuc.fnn.steuerbox.models.Requirement.LN03;
+import static org.openmuc.fnn.steuerbox.models.Requirement.S08;
+import static org.openmuc.fnn.steuerbox.models.Requirement.S13;
+import static org.openmuc.fnn.steuerbox.models.Requirement.S14;
+import static org.openmuc.fnn.steuerbox.models.Requirement.S15;
 
 /**
  * Holds tests related to 61850 schedule node behaviour
@@ -22,16 +44,11 @@ public class ScheduleNodeTests extends AllianderBaseTest {
 
     private static final Logger log = LoggerFactory.getLogger(ScheduleNodeTests.class);
 
-    /**
-     * Test if the scheduler has the required nodes with correct types as defined in IEC 61850-90-10:2017, table 7 (page
-     * 26)
-     * <p>
-     * This test is not idenependent from our current use case
-     **/
-    // TODO MZ: fix types of DsaReq, EnaReq
+    @Requirements(value = { LN03, LN01 },
+            description = "Test if the scheduler has the required nodes with correct types as defined in IEC 61850-90-10:2017, table 7 (page 26)")
     @ParameterizedTest(name = "hasRequiredSubNodes running {0}")
     @MethodSource("getAllSchedules")
-    void hasRequiredSubNodes(ScheduleConstants scheduleConstants) {
+    <X> void hasRequiredSubNodes(ScheduleDefinitions<X> scheduleConstants) {
 
         // relevant part of the table is the "non-derived-statistics" (nds) column as there are no derived-statistic
 
@@ -72,6 +89,8 @@ public class ScheduleNodeTests extends AllianderBaseTest {
             mandatory.put("Beh", Fc.ST);
             optional.put("Health", Fc.ST);
             optional.put("Mir", Fc.ST);
+            mandatory.put("EnaReq", Fc.ST);
+            mandatory.put("DsaReq", Fc.ST);
 
             /**
              *  Measured and metered values (MX)
@@ -81,8 +100,6 @@ public class ScheduleNodeTests extends AllianderBaseTest {
             /**
              * Controls (CO)
              */
-            mandatory.put("EnaReq", Fc.CO);
-            mandatory.put("DsaReq", Fc.CO);
             optional.put("Mod", Fc.CO);
 
             /**
@@ -96,7 +113,7 @@ public class ScheduleNodeTests extends AllianderBaseTest {
             //at least one element needs to be present if ValINS is present, otherwise forbidden
             mMultiF.add(ifPresent("ValINS").thenMandatory("ValING001", Fc.SP));
             //at least one element needs to be present if ValISPS is present, otherwise forbidden
-            mMultiF.add(ifPresent("ValISPS").thenMandatory("ValSPG001", Fc.SP));
+            mMultiF.add(ifPresent("ValSPS").thenMandatory("ValSPG001", Fc.SP));
             //at least one element needs to be present if ValENS is present, otherwise forbidden
             mMultiF.add(ifPresent("ValENS").thenMandatory("ValENG001", Fc.SP));
             oMulti.put("StrTm", Fc.SP);
@@ -116,176 +133,461 @@ public class ScheduleNodeTests extends AllianderBaseTest {
             String delimiter = "\n - ";
             String violationsList = delimiter + String.join(delimiter, violations);
 
-            org.junit.jupiter.api.Assertions.assertTrue(violations.isEmpty(),
+            assertTrue(violations.isEmpty(),
                     "Found violations of node requirements for schedule " + scheduleName + ": " + violationsList);
 
         }
     }
 
-    /**
-     * Test that SchdEntr is present and is updated by the currently running schedule as described in  IEC
-     * 61850-90-10:2017, table 7 (page 26)
-     **/
-    @Disabled
+    @Requirements(value = LN03,
+            description = "Test that SchdEntr is present and is updated by the currently running schedule as described in  IEC 61850-90-10:2017, table 7 (page 26)")
     @ParameterizedTest(name = "SchdEntrIsUpdatedWithCurrentlyRunningScheduleIfPresent running {0}")
     @MethodSource("getAllSchedules")
-    void SchdEntrIsUpdatedWithCurrentlyRunningScheduleIfPresent(ScheduleConstants scheduleConstants) {
+    <X> void SchdEntrIsUpdatedWithCurrentlyRunningScheduleIfPresent(ScheduleDefinitions<X> scheduleConstants)
+            throws ServiceError, IOException, InterruptedException {
         // test if SchdEntr is available
 
-        // if no, log and exit
+        // test all 10 schedules of one scheduleConstant one by one
+        for (String scheduleName : scheduleConstants.getAllScheduleNames()) {
 
-        // if present:
-        // contains 0 because no schedule is running
+            //disable the schedule and display the name
+            dut.disableSchedule(scheduleName);
+            log.info(scheduleName);
 
-        // start schedule
+            //check if optional SchEntr is present
+            boolean isPresent = dut.nodeExists(scheduleName + ".SchdEntr");
+            if (isPresent) {
 
-        // contains a value now
+                //display the state of the schedule
+                log.info("State of the schedule: " + dut.getScheduleState(scheduleName).toString());
 
-        /**
-         * From table:
-         * The current schedule entry of a running schedule.
-         * This is the Data-Instance-ID of the data object
-         * ValXXX (e.g. ValASG). As long as the schedule is
-         * not running the value shall be 0.
-         */
-        org.junit.jupiter.api.Assertions.fail("not implemented");
+                //if state of the schedule is not RUNNING SchdEntr might be 0
+                if (dut.getScheduleState(scheduleName) != ScheduleState.RUNNING) {
+                    String notRunningSchdEntrValueAsString = dut.getNodeEntryasString(scheduleName, "SchdEntr",
+                            "stVal");
+                    Assertions.assertEquals("0", notRunningSchdEntrValueAsString,
+                            "SchdEntry is not 0 although schedule is not running");
+                }
+
+                //now write a schedule and check if SchdEntry is not 0
+                PreparedSchedule preparedSchedule = scheduleConstants.prepareSchedule(
+                        scheduleConstants.getDefaultValues(1), scheduleConstants.getScheduleNumber(scheduleName),
+                        ofSeconds(8), Instant.now().plusMillis(500), 20);
+                dut.writeAndEnableSchedule(preparedSchedule);
+                Thread.sleep(4000);
+                String runningSchdEntrValueAsString = dut.getNodeEntryasString(scheduleName, "SchdEntr", "stVal");
+                Assertions.assertNotEquals("0", runningSchdEntrValueAsString,
+                        "SchdEntry is 0 although schedule is running");
+            }
+            else {
+                log.info("Optional node SchdEntr not found, skipping test");
+            }
+        }
     }
 
     /**
-     * Test that ValINS is not present (because it is not relevant for our use case  thus we cannot/do not want to test
-     * the expected behaviour). IEC 61850-90-10:2017, table 7 (page 26)
+     * INS = Integer status; we do not have integer schedules thus we ValINS should not be present Test that ValINS is
+     * not present (because it is not relevant for our use case thus we cannot/do not want to test the expected
+     * behaviour). IEC 61850-90-10:2017, table 7 (page 26)
      **/
+    @Requirements(value = LN03,
+            description = "Test that ValINS is not available")
     @ParameterizedTest(name = "ValINSIsUpdatedWithCurrentlyRunningScheduleIfPresent running {0}")
     @MethodSource("getAllSchedules")
-    void ValINSIsUpdatedWithCurrentlyRunningScheduleIfPresent(ScheduleConstants scheduleConstants) {
+    void ValINSIsUpdatedWithCurrentlyRunningScheduleIfPresent(ScheduleDefinitions scheduleConstants) {
         testOptionalNodeNotPresent(scheduleConstants, "ValINS");
     }
 
     /**
-     * Test that ValSPS is not present (because it is not relevant for our use case  thus we cannot/do not want to test
-     * the expected behaviour). IEC 61850-90-10:2017, table 7 (page 26)
+     * SPS = single point status, we assume that it is the readout value of boolean schedules Test that ValSPS is
+     * present when having a boolean schedule, in this case it should behave like defined in IEC 61850-90-10:2017, table
+     * 7 (page 26) if we don't have a boolean schedule we have a float schedule; in this case test that ValMV is present
+     * and that it behaves like defined in the same table
      **/
+    @Requirements(value = LN03,
+            description = "Test ValSPS/ValMv behaves as defined in IEC 61850-90-10:2017, table 7 (page 26) ")
     @ParameterizedTest(name = "ValSpsIsUpdatedWithCurrentlyRunningScheduleIfPresent running {0}")
-    @MethodSource("getPowerValueSchedules")
-    void ValSpsIsUpdatedWithCurrentlyRunningScheduleIfPresent(ScheduleConstants scheduleConstants) {
-        testOptionalNodeNotPresent(scheduleConstants, "ValSPS");
-        // TODO implement for OnOff schedules
+    @MethodSource("getAllSchedules")
+    <X> void ValSpsOrValMvIsUpdatedWithCurrentlyRunningSchedule(ScheduleDefinitions<X> scheduleConstants)
+            throws ServiceError, IOException, InterruptedException {
+
+        for (String scheduleName : scheduleConstants.getAllScheduleNames()) {
+
+            PreparedSchedule schedule = scheduleConstants.prepareSchedule(scheduleConstants.getDefaultValues(1),
+                    scheduleConstants.getScheduleNumber(scheduleName), ofSeconds(2), Instant.now(), 20);
+
+            if (ScheduleType.SPG.equals(scheduleConstants.getScheduleType())) {
+
+                //test, that node ValSPS is present
+                assertTrue(dut.nodeExists(scheduleName + ".ValSPS"));
+
+                //initial valid status
+                dut.writeAndEnableSchedule(schedule);
+                Thread.sleep(1000);
+                dut.disableSchedules(scheduleName);
+
+                //if schedule is inactive, quality of ValSPS should be set to invalid
+                Assertions.assertEquals("INVALID", dut.getNodeEntryasString(scheduleName, "ValSPS", "q"));
+
+                //if schedule is active, ValSPS should hold the current value determined by the schedule
+                dut.writeAndEnableSchedule(schedule);
+                List<Boolean> actualValues = dut.monitor(Instant.now(), ofSeconds(2), ofSeconds(2), scheduleConstants);
+                List<Boolean> expectedValues = Arrays.asList(true);
+                assertValuesMatch(expectedValues, actualValues);
+            }
+            else {
+                testOptionalNodeNotPresent(scheduleConstants, "ValSPS");
+                assertTrue(dut.nodeExists(scheduleName + ".ValMV"));
+
+                //initial valid status
+                dut.writeAndEnableSchedule(schedule);
+                Thread.sleep(1000);
+                dut.disableSchedules(scheduleName);
+
+                //if schedule is inactive, quality of ValMV should be set to invalid
+                Assertions.assertEquals("INVALID", dut.getNodeEntryasString(scheduleName, "ValMV", "q"));
+
+                //activate schedule
+                Instant timestamp = Instant.now().plusSeconds(2).truncatedTo(ChronoUnit.SECONDS);
+                PreparedSchedule preparedSchedule = scheduleConstants.prepareSchedule(
+                        scheduleConstants.getDefaultValues(1), scheduleConstants.getScheduleNumber(scheduleName),
+                        ofSeconds(8), timestamp, 20);
+                dut.writeAndEnableSchedule(preparedSchedule);
+
+                //monitor returns the ValMV-values, need to be the one we set with the schedule
+                List<Float> actualValues = dut.monitor(timestamp, ofSeconds(8), ofSeconds(8), scheduleConstants);
+                List<Float> expectedValues = Arrays.asList(0.0f);
+                assertValuesMatch(expectedValues, actualValues, 0.1);
+            }
+        }
     }
 
     /**
+     * ENS = enumerated status, we do not have a schedule with enumerated value thus we can not have the node ValENS
      * Test that ValENS is not present (because it is not relevant for our use case  thus we cannot/do not want to test
      * the expected behaviour). IEC 61850-90-10:2017, table 7 (page 26)
      **/
+    @Requirements(value = LN03,
+            description = "Test that ValENS is not available")
     @ParameterizedTest(name = "ValEnsIsUpdatedWithCurrentlyRunningScheduleIfPresent running {0}")
     @MethodSource("getAllSchedules")
-    void ValEnsIsUpdatedWithCurrentlyRunningScheduleIfPresent(ScheduleConstants scheduleConstants) {
+    void ValEnsIsUpdatedWithCurrentlyRunningScheduleIfPresent(ScheduleDefinitions<?> scheduleConstants) {
         testOptionalNodeNotPresent(scheduleConstants, "ValENS");
     }
 
-    /**
-     * Test that ActStrTm is updated according to IEC 61850-90-10:2017, table 7 (page 26)
-     * <p>
-     * See "Explanation" column of ActStrTm, NxtStrTm and ValMV. This test summarizes the requirements such that each
-     * schedule needs to run only once. By doing so, the total test duration is reduced.
-     **/
-    @Disabled
-    @ParameterizedTest(name = "ActStrTm_and_NxtStrTm_ValMV_areUpdatedProperly running {0}")
+    @Requirements(value = LN03,
+            description = "Test if optional node ActStrTm is present it should behave like defined in IEC 61850-90-10:2017, table 7 (page 26)")
+    @ParameterizedTest(name = "ActStrTmIsUpdatedProperly running {0}")
     @MethodSource("getAllSchedules")
-    void ActStrTm_and_NxtStrTm_ValMV_areUpdatedProperly(ScheduleConstants scheduleConstants) {
-        /**
-         * ActStrTm:
-         * The time when the schedule started running. If the
-         * schedule is not running, the quality of the value is
-         * set to invalid.
-         */
+    <X> void ActStrTmIsUpdatedProperly(ScheduleDefinitions<X> scheduleConstants)
+            throws ServiceError, IOException, InterruptedException {
+        for (String scheduleName : scheduleConstants.getAllScheduleNames()) {
+            if (dut.nodeExists(scheduleName + ".ActStrTm")) {
+                PreparedSchedule schedule = scheduleConstants.prepareSchedule(scheduleConstants.getDefaultValues(1),
+                        scheduleConstants.getScheduleNumber(scheduleName), ofSeconds(2), Instant.now(), 20);
 
-        /**
-         * NxtStrTm:
-         * The next time when the schedule is
-         * planned/intented to start or re-start running. If no
-         * schedules are planned running, the quality of the
-         * value is set to invalid.
-         */
+                //initial status
+                dut.writeAndEnableSchedule(schedule);
+                Thread.sleep(1000);
+                dut.disableSchedules(scheduleName);
 
-        /**
-         * ValMV:
-         * Current value determined by the schedule. As long
-         * as the schedule is not running the quality of the
-         * value shall be set to invalid. The unit of this data
-         * shall be the same as the unit of the data object(s)
-         * ValASG.
-         */
+                //if schedule is disabled, quality of ActStrTm should be invalid
+                Assertions.assertEquals("INVALID", dut.getNodeEntryasString(scheduleName, "ActStrTm", "q"));
 
-        // TODO:
-        // disable schedule and make sure ActStrTm & NxtStrTm quality is set to invalid
-
-        // enable scheudle and make sure the NxtStrTm date is set here
-
-        //wait until running and make sure ActStrTm is at executtion start and NxtStrTm is set to invalid
-
-        org.junit.jupiter.api.Assertions.fail("not implemented");
+                //if schedule is active, ActStrTm.stVal should have the timestamp the active schedule started
+                Instant timestamp = Instant.now().plusSeconds(2).truncatedTo(ChronoUnit.SECONDS);
+                PreparedSchedule preparedSchedule = scheduleConstants.prepareSchedule(
+                        scheduleConstants.getDefaultValues(1), scheduleConstants.getScheduleNumber(scheduleName),
+                        ofSeconds(4), timestamp, 20);
+                dut.writeAndEnableSchedule(preparedSchedule);
+                Thread.sleep(3000);
+                Assertions.assertEquals(timestamp.toString(),
+                        dut.getNodeEntryasString(scheduleName, "ActStrTm", "stVal"));
+            }
+        }
     }
 
-    /**
-     * Test that SchdEnaErr holds a reasonable error code after provoking errors whilest enabling schedules. See IEC
-     * 61850-90-10:2017, table 7 (page 26)
-     **/
-    @Disabled
+    @Requirements(value = LN03,
+            description = "Test if NxtStrTm is mandatory and should behave like defined in IEC 61850-90-10:2017, table 7 (page 26)")
+    @ParameterizedTest(name = "NxtStrTmIsUpdatedProperly running {0}")
+    @MethodSource("getAllSchedules")
+    <X> void NxtStrTmIsUpdatedProperly(ScheduleDefinitions<X> scheduleConstants)
+            throws ServiceError, IOException, InterruptedException {
+        for (String scheduleName : scheduleConstants.getAllScheduleNames()) {
+            PreparedSchedule schedule = scheduleConstants.prepareSchedule(scheduleConstants.getDefaultValues(1),
+                    scheduleConstants.getScheduleNumber(scheduleName), ofSeconds(2), Instant.now(), 20);
+
+            //initial status
+            dut.writeAndEnableSchedule(schedule);
+            Thread.sleep(1000);
+            dut.disableSchedules(scheduleName);
+
+            //if schedule is disabled, quality of ActStrTm should be invalid
+            Assertions.assertEquals("INVALID", dut.getNodeEntryasString(scheduleName, "NxtStrTm", "q"));
+
+            //if schedule is active, ActStrTm.stVal should have the timestamp the active schedule started
+            Instant timestamp = Instant.now().plusSeconds(2).truncatedTo(ChronoUnit.SECONDS);
+            PreparedSchedule preparedSchedule = scheduleConstants.prepareSchedule(scheduleConstants.getDefaultValues(1),
+                    scheduleConstants.getScheduleNumber(scheduleName), ofSeconds(2), timestamp, 20);
+            dut.writeAndEnableSchedule(preparedSchedule);
+            Assertions.assertEquals(timestamp.toString(), dut.getNodeEntryasString(scheduleName, "NxtStrTm", "stVal"));
+        }
+    }
+
+    @Requirements(value = LN03,
+            description =
+                    "Test that EnaReq holds a reasonable error code after provoking errors whilst enabling schedules. "
+                            + "See IEC 61850-90-10:2017, table 7 (page 26)")
     @ParameterizedTest(name = "EnaReq_operating running {0}")
     @MethodSource("getAllSchedules")
-    void EnaReq_operating(ScheduleConstants scheduleConstants) {
-        /**
-         * (controllable) Operating with value true initiates
-         * enable transition request according to the state
-         * diagram; operating with value false is ignored. The
-         * change of its status value is a local issue.
-         */
-        // TODO: see above
+    <X> void EnaReq_operating(ScheduleDefinitions<X> scheduleConstants)
+            throws ServiceError, IOException, InterruptedException {
+        for (String scheduleName : scheduleConstants.getAllScheduleNames()) {
 
+            // intial: schedule has valid values set
+            PreparedSchedule preparedSchedule = scheduleConstants.prepareSchedule(scheduleConstants.getDefaultValues(1),
+                    scheduleConstants.getScheduleNumber(scheduleName), ofSeconds(1), Instant.now().plusSeconds(100),
+                    100);
+            dut.writeAndEnableSchedule(preparedSchedule);
+            dut.disableSchedule(scheduleName);
+            Thread.sleep(2000);
+            // test if intial state is correct: should be in inital state
+            Assertions.assertEquals(ScheduleState.NOT_READY, dut.getScheduleState(scheduleName));
+
+            // test 1: operating with value false should be possible the status should ignore that
+            BasicDataAttribute enableOp = dut.findAndAssignValue(scheduleName + ".EnaReq.Oper.ctlVal", Fc.CO, "false");
+            dut.operate((FcModelNode) enableOp.getParent().getParent());
+            // still same state:
+            Assertions.assertEquals(ScheduleState.NOT_READY, dut.getScheduleState(scheduleName));
+
+            // test2: when operating with value true on .EnaReq.Oper.ctlVal and when integrity check passes, schedule should be in ready state
+            enableOp = dut.findAndAssignValue(scheduleName + ".EnaReq.Oper.ctlVal", Fc.CO, "true");
+            dut.operate((FcModelNode) enableOp.getParent().getParent());
+            Assertions.assertEquals(ScheduleState.READY, dut.getScheduleState(scheduleName));
+        }
     }
 
-    /**
-     * Test that SchdEnaErr holds a reasonable error code after provoking errors whilest enabling schedules. See IEC
-     * 61850-90-10:2017, table 7 (page 26)
-     **/
-    @Disabled
+    @Requirements(value = LN03,
+            description = "Test that DsaReq behaves as described in IEC 61850-90-10:2017, table 7 (page 26)")
     @ParameterizedTest(name = "DsaReq_operating running {0}")
     @MethodSource("getAllSchedules")
-    void DsaReq_operating(ScheduleConstants scheduleConstants) {
-        /**
-         * (controllable) Operating with value true initiates
-         * disable transition request according to the state diagram; operating with value false is ignored. The
-         * change of its status value is a local issue.
-         */
-        // TODO: see above
+    <X> void DsaReq_operating(ScheduleDefinitions<X> scheduleConstants)
+            throws ServiceError, IOException, InterruptedException {
 
-        org.junit.jupiter.api.Assertions.fail("not implemented");
+        for (String scheduleName : scheduleConstants.getAllScheduleNames()) {
+
+            // intial: schedule has valid values set
+            PreparedSchedule initialSchedule = scheduleConstants.prepareSchedule(scheduleConstants.getDefaultValues(1),
+                    scheduleConstants.getScheduleNumber(scheduleName), ofSeconds(1), Instant.now().plusSeconds(2), 100);
+            dut.writeAndEnableSchedule(initialSchedule);
+            dut.disableSchedule(scheduleName);
+            Thread.sleep(2000);
+            // test if initial state is correct: should be in NOT_READY
+            Assertions.assertEquals(ScheduleState.NOT_READY, dut.getScheduleState(scheduleName));
+
+            // test if operating with value false on DsaReq is ignored
+            BasicDataAttribute disableOp = dut.findAndAssignValue(scheduleName + ".DsaReq.Oper.ctlVal", Fc.CO, "false");
+            dut.operate((FcModelNode) disableOp.getParent().getParent());
+            Assertions.assertEquals(ScheduleState.NOT_READY, dut.getScheduleState(scheduleName));
+
+            // test, if in disabled state and operating DsaReq with true, state ist still NOT_READY
+            disableOp = dut.findAndAssignValue(scheduleName + ".DsaReq.Oper.ctlVal", Fc.CO, "true");
+            dut.operate((FcModelNode) disableOp.getParent().getParent());
+            Assertions.assertEquals(ScheduleState.NOT_READY, dut.getScheduleState(scheduleName));
+
+            // test, if in enabled state and operating DsaReq with true, state turns into NOT_READY
+            PreparedSchedule updatedSchedule = scheduleConstants.prepareSchedule(scheduleConstants.getDefaultValues(1),
+                    scheduleConstants.getScheduleNumber(scheduleName), ofSeconds(5), Instant.now().plusSeconds(1), 100);
+            dut.writeAndEnableSchedule(updatedSchedule);
+            disableOp = dut.findAndAssignValue(scheduleName + ".DsaReq.Oper.ctlVal", Fc.CO, "true");
+            dut.operate((FcModelNode) disableOp.getParent().getParent());
+            Thread.sleep(2000);
+            Assertions.assertEquals(ScheduleState.NOT_READY, dut.getScheduleState(scheduleName));
+        }
     }
 
-    /**
-     * Test that SchdEnaErr holds a reasonable error code after provoking errors whilest enabling schedules. See IEC
-     * 61850-90-10:2017, table 7 (page 26)
-     **/
-    @Disabled
-    @ParameterizedTest(name = "SchdEnaErrHoldsErrorCode running {0}")
+    @Requirements(value = { LN03, S08 },
+            description = "Test that SchdEnaErr holds MISSING_VALID_NUMENTR when writing invalid value to NumEntr.setVal (see IEC 61850-90-10:2017, table 7 (page 26))")
+    @ParameterizedTest(name = "schdEnaErr_HoldsMISSING_VALID_NUMENTRcorrectly running {0}")
     @MethodSource("getAllSchedules")
-    void SchdEnaErrHoldsErrorCode(ScheduleConstants scheduleConstants) {
-        // TODO: implement with e.g. one example
+    <X> void schdEnaErr_HoldsMISSING_VALID_NUMENTRcorrectly(ScheduleDefinitions<X> scheduleConstants)
+            throws ServiceError, IOException, InterruptedException {
+        for (String scheduleName : scheduleConstants.getAllScheduleNames()) {
 
-        org.junit.jupiter.api.Assertions.fail("not implemented");
+            // intial: valid values in NumEntr, Schdintv, SchdValues and test that SchdEnaErr shows no error kind
+            PreparedSchedule schedule = scheduleConstants.prepareSchedule(scheduleConstants.getDefaultValues(1),
+                    scheduleConstants.getScheduleNumber(scheduleName), ofSeconds(1), Instant.now().plusSeconds(2), 100);
+            dut.writeAndEnableSchedule(schedule);
+            Thread.sleep(200);
+            Assertions.assertEquals(ScheduleEnablingErrorKind.NONE, dut.getSchdEnaErr(scheduleName));
+            dut.disableSchedule(scheduleName);
+
+            // provoke error  MISSING_VALID_NUMENTR by setting NumEntr = -1
+            dut.setDataValues(scheduleName + ".NumEntr.setVal", null, "-1");
+            BasicDataAttribute disableOp1 = dut.findAndAssignValue(scheduleName + ".DsaReq.Oper.ctlVal", Fc.CO,
+                    "false");
+            BasicDataAttribute enableOp1 = dut.findAndAssignValue(scheduleName + ".EnaReq.Oper.ctlVal", Fc.CO, "true");
+            // operating will throw, we ignore that error
+            dut.operate((FcModelNode) disableOp1.getParent().getParent());
+            Executable executable1 = () -> {
+                dut.operate((FcModelNode) enableOp1.getParent().getParent());
+            };
+            Assertions.assertThrows(ServiceError.class, executable1);
+            Assertions.assertEquals(ScheduleEnablingErrorKind.MISSING_VALID_NUMENTR, dut.getSchdEnaErr(scheduleName));
+        }
+    }
+
+    @Requirements(value = { LN03, S08 },
+            description = "Test that SchdEnaErr holds MISSING_VALID_SCHDINTV when writing invalid value to SchdIntv.setVal (see IEC 61850-90-10:2017, table 7 (page 26))")
+    @ParameterizedTest(name = "SchdEnaErrHoldsMISSING_VALID_SCHDINTVcorrectly running {0}")
+    @MethodSource("getAllSchedules")
+    <X> void SchdEnaErrHoldsMISSING_VALID_SCHDINTVcorrectly(ScheduleDefinitions<X> scheduleConstants)
+            throws ServiceError, IOException, InterruptedException {
+        for (String scheduleName : scheduleConstants.getAllScheduleNames()) {
+
+            // intial: valid values in NumEntr, Schdintv, SchdValues and test that SchdEnaErr shows no error kind
+            PreparedSchedule schedule = scheduleConstants.prepareSchedule(scheduleConstants.getDefaultValues(1),
+                    scheduleConstants.getScheduleNumber(scheduleName), ofSeconds(1), Instant.now().plusSeconds(2), 100);
+            dut.writeAndEnableSchedule(schedule);
+            Thread.sleep(200);
+            Assertions.assertEquals(ScheduleEnablingErrorKind.NONE, dut.getSchdEnaErr(scheduleName));
+            dut.disableSchedule(scheduleName);
+
+            // provoke error  MISSING_VALID_SCHDINTV by setting SchdIntv = -1
+            dut.setDataValues(scheduleName + ".SchdIntv.setVal", null, "-1");
+            BasicDataAttribute disableOp1 = dut.findAndAssignValue(scheduleName + ".DsaReq.Oper.ctlVal", Fc.CO,
+                    "false");
+            BasicDataAttribute enableOp1 = dut.findAndAssignValue(scheduleName + ".EnaReq.Oper.ctlVal", Fc.CO, "true");
+            // operating will throw, we ignore that error
+            dut.operate((FcModelNode) disableOp1.getParent().getParent());
+            Executable executable1 = () -> {
+                dut.operate((FcModelNode) enableOp1.getParent().getParent());
+            };
+            Assertions.assertThrows(ServiceError.class, executable1);
+            Assertions.assertEquals(ScheduleEnablingErrorKind.MISSING_VALID_SCHDINTV, dut.getSchdEnaErr(scheduleName));
+        }
     }
 
     /**
-     * Test that NumEntr can only be set to values > 0  and values <= the number of  instantiated Val[ASG|ING|SPG|ENG]'s
-     * as stated in IEC 61850-90-10:2017, table 7 (page 26)
-     **/
-    @Disabled
+     * This test exists only for float values, there is no possibility to create such a test for boolean schedules (as
+     * there are no invalid values for boolean)
+     */
+    @Requirements(value = { LN03, S08 },
+            description = "Tests that SchdEnaErr holds the error code MISSING_VALID_SCHEDULE_VALUE when invalid values are written, for (Max)Power Schedules (see IEC 61850-90-10:2017, table 7 (page 26))")
+    @ParameterizedTest(name = "SchdEnaErrHoldsMISSING_VALID_SCHEDULE_VALUEScorrectlyFloatValues running {0}")
+    @MethodSource("getPowerValueSchedules")
+    void SchdEnaErrHoldsMISSING_VALID_SCHEDULE_VALUEScorrectly(ScheduleDefinitions<Number> scheduleConstants)
+            throws ServiceError, IOException, InterruptedException {
+        for (String scheduleName : scheduleConstants.getAllScheduleNames()) {
+
+            // intial: valid values in SchdValues, test that it shows no error kind
+            PreparedSchedule schedule = scheduleConstants.prepareSchedule(scheduleConstants.getDefaultValues(1),
+                    scheduleConstants.getScheduleNumber(scheduleName), ofSeconds(1), Instant.now().plusSeconds(2), 100);
+            dut.writeAndEnableSchedule(schedule);
+            Thread.sleep(200);
+            Assertions.assertEquals(ScheduleEnablingErrorKind.NONE, dut.getSchdEnaErr(scheduleName));
+            dut.disableSchedule(scheduleName);
+
+            //Provoke MISSING_VALID_SCHEDULE_VALUES error kind by writing invalid values
+            Executable excecutable = () -> {
+                dut.writeAndEnableSchedule(scheduleConstants.prepareSchedule(
+                        Arrays.asList(Float.NaN, Float.MAX_VALUE, Float.POSITIVE_INFINITY), 1, ofSeconds(2),
+                        Instant.now().plusSeconds(1), 100));
+            };
+            Assertions.assertThrows(ServiceError.class, excecutable);
+            Assertions.assertEquals(ScheduleEnablingErrorKind.MISSING_VALID_SCHEDULE_VALUES,
+                    dut.getSchdEnaErr(scheduleName));
+        }
+    }
+
+    @Requirements(value = LN03,
+            description =
+                    "Test that NumEntr can only be set to values > 0  and values <= the number of  instantiated Val[ASG|ING|SPG|ENG]'s "
+                            + "as stated in IEC 61850-90-10:2017, table 7 (page 26)")
     @ParameterizedTest(name = "NumEntr_range running {0}")
     @MethodSource("getAllSchedules")
-    void NumEntr_range(ScheduleConstants scheduleConstants) {
-        // TODO: test that it cannot be set to 0, -1 and 101
+    <X> void NumEntr_range(ScheduleDefinitions<X> scheduleConstants)
+            throws ServiceError, IOException, InterruptedException {
 
-        org.junit.jupiter.api.Assertions.fail("not implemented");
+        String scheduleName = scheduleConstants.getScheduleName(1);
+        // intial: valid values in NumEntr
+        PreparedSchedule schedule = scheduleConstants.prepareSchedule(scheduleConstants.getDefaultValues(1),
+                scheduleConstants.getScheduleNumber(scheduleName), ofSeconds(1), Instant.now().plusSeconds(2), 100);
+        dut.writeAndEnableSchedule(schedule);
+        Thread.sleep(200);
+        dut.disableSchedule(scheduleName);
+
+        //test: 0 can not bet set to NumEtr
+        dut.setDataValues(scheduleName + ".NumEntr.setVal", null, "0");
+        BasicDataAttribute disableOp = dut.findAndAssignValue(scheduleName + ".DsaReq.Oper.ctlVal", Fc.CO, "false");
+        BasicDataAttribute enableOp = dut.findAndAssignValue(scheduleName + ".EnaReq.Oper.ctlVal", Fc.CO, "true");
+        dut.operate((FcModelNode) disableOp.getParent().getParent());
+        Executable executable = () -> dut.operate((FcModelNode) enableOp.getParent().getParent());
+        Assertions.assertThrows(ServiceError.class, executable);
+
+        //test: -1 can not bet set to NumEtr
+        dut.setDataValues(scheduleName + ".NumEntr.setVal", null, "-1");
+        disableOp = dut.findAndAssignValue(scheduleName + ".DsaReq.Oper.ctlVal", Fc.CO, "false");
+        BasicDataAttribute enableOp2 = dut.findAndAssignValue(scheduleName + ".EnaReq.Oper.ctlVal", Fc.CO, "true");
+        dut.operate((FcModelNode) disableOp.getParent().getParent());
+        Executable executable2 = () -> dut.operate((FcModelNode) enableOp2.getParent().getParent());
+        Assertions.assertThrows(ServiceError.class, executable2);
+
+        //test: 200 can not bet set to NumEtr
+        dut.setDataValues(scheduleName + ".NumEntr.setVal", null, "200");
+        disableOp = dut.findAndAssignValue(scheduleName + ".DsaReq.Oper.ctlVal", Fc.CO, "false");
+        BasicDataAttribute enableOp3 = dut.findAndAssignValue(scheduleName + ".EnaReq.Oper.ctlVal", Fc.CO, "true");
+        dut.operate((FcModelNode) disableOp.getParent().getParent());
+        Executable executable3 = () -> dut.operate((FcModelNode) enableOp3.getParent().getParent());
+        Assertions.assertThrows(ServiceError.class, executable3);
+
+    }
+
+    @Requirements(S13)
+    @ParameterizedTest(name = "reserveSchedulesCannotBeDeactivated running {0}")
+    @MethodSource("getAllSchedules")
+    public void reserveSchedulesCannotBeDeactivated(ScheduleDefinitions scheduleConstants)
+            throws ServiceError, IOException {
+
+        disableAllRunningSchedules();
+
+        // if all other schedules are deactivated, the reserve schedule should be running
+        final String reserveSchedule = scheduleConstants.getReserveSchedule();
+        Assertions.assertEquals(ScheduleState.RUNNING, dut.getScheduleState(reserveSchedule));
+        try {
+            dut.disableSchedules(reserveSchedule);
+        } catch (ServiceError e) {
+            // an access violation may be thrown here, this indicates the schedule cannot be deactivated
+        }
+        Assertions.assertEquals(ScheduleState.RUNNING, dut.getScheduleState(reserveSchedule));
+    }
+
+    @ParameterizedTest(name = "reserveSchedulesHaveFixedPriority running {0}")
+    @MethodSource("getAllSchedules")
+    @Requirements(S14)
+    public void reserveSchedulesHaveFixedPriority(ScheduleDefinitions scheduleConstants)
+            throws ServiceError, IOException {
+        final String reserveSchedule = scheduleConstants.getReserveSchedule();
+        try {
+            dut.setSchedulePrio(reserveSchedule, 100);
+        } catch (ServiceError e) {
+            // an access violation may be thrown here, this indicates the prio cannot be changed
+        }
+        Assertions.assertEquals(10, dut.readSchedulePrio(reserveSchedule));
+    }
+
+    @ParameterizedTest(name = "reserveSchedulesHaveFixedStart running {0}")
+    @MethodSource("getAllSchedules")
+    @Requirements(S15)
+    public void reserveSchedulesHaveFixedStart(ScheduleDefinitions scheduleConstants) throws ServiceError, IOException {
+        final String reserveSchedule = scheduleConstants.getReserveSchedule();
+        Assertions.assertEquals(Instant.ofEpochSecond(1), dut.getScheduleStart(reserveSchedule));
+        try {
+            dut.setScheduleStart(reserveSchedule, Instant.now());
+        } catch (ServiceError e) {
+            // an access violation may be thrown here, this indicates the start date cannot be changed
+        }
+        Assertions.assertEquals(Instant.ofEpochSecond(1), dut.getScheduleStart(reserveSchedule));
     }
 
     /**
@@ -296,7 +598,7 @@ public class ScheduleNodeTests extends AllianderBaseTest {
      * Tests that a node is not present in the model. This is to facilitate testing as we can simply leave out nodes
      * that are not relevant for our use case.
      */
-    private void testOptionalNodeNotPresent(ScheduleConstants scheduleConstants, String nodeName) {
+    private void testOptionalNodeNotPresent(ScheduleDefinitions scheduleConstants, String nodeName) {
         scheduleConstants.getAllScheduleNames().forEach(schedule -> {
             org.junit.jupiter.api.Assertions.assertFalse(dut.nodeExists(schedule + "." + nodeName),
                     "Optional node " + nodeName

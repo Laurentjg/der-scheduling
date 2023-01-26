@@ -38,7 +38,7 @@ public class UtilityTest {
         dut.setDataValues(valueBasicDataAttribute, null, Float.toString(expectedValue));
 
         Assertions.assertEquals(expectedValue,
-                dut.readConstantPowerFromSysResScheduleFromModelNode(dut.powerSchedules.getValueAccess(),
+                (float) dut.readConstantValueFromSysResScheduleFromModelNode(dut.powerSchedules.getValueAccess(),
                         reserveScheduleName));
     }
 
@@ -60,7 +60,7 @@ public class UtilityTest {
         // set number of values (NumEntr) to 2
         dut.setDataValues(reserveScheduleName + ".NumEntr.setVal", null, "2");
 
-        Executable executableThatShouldThrow = () -> dut.readConstantPowerFromSysResScheduleFromModelNode(
+        Executable executableThatShouldThrow = () -> dut.readConstantValueFromSysResScheduleFromModelNode(
                 dut.powerSchedules.getValueAccess(), reserveScheduleName);
         IEC61850MissconfiguredException caughtException = Assertions.assertThrows(IEC61850MissconfiguredException.class,
                 executableThatShouldThrow);
