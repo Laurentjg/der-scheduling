@@ -1,0 +1,7 @@
+# do not include test results
+conformance-tests/*results
+conformance-tests/testResults
+conformance-tests/target/allure-results
+
+# do not include test build files
+conformance-tests/build
