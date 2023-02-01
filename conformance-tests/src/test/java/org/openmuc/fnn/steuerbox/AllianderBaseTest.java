@@ -1,3 +1,16 @@
+/*
+ * Copyright 2023 Fraunhofer ISE
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ */
+
 package org.openmuc.fnn.steuerbox;
 
 import com.beanit.iec61850bean.Fc;
@@ -5,9 +18,8 @@ import com.beanit.iec61850bean.FcModelNode;
 import com.beanit.iec61850bean.ModelNode;
 import com.beanit.iec61850bean.ObjectReference;
 import com.beanit.iec61850bean.ServiceError;
-import org.assertj.core.api.Assertions;
-import org.assertj.core.data.Percentage;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.openmuc.fnn.steuerbox.models.AllianderDER;
 import org.openmuc.fnn.steuerbox.scheduling.ScheduleDefinitions;
@@ -79,20 +91,26 @@ public abstract class AllianderBaseTest {
     }
 
     public static void assertValuesMatch(List<Float> expectedValues, List<Float> actualValues, double withPercentage) {
-        Assertions.assertThat(actualValues).hasSameSizeAs(expectedValues);
+        Assertions.assertEquals(actualValues.size(), expectedValues.size());
         for (int i = 0; i < expectedValues.size(); i++) {
             Float expected = expectedValues.get(i);
             Float actual = actualValues.get(i);
-            Assertions.assertThat(actual).isCloseTo(expected, Percentage.withPercentage(withPercentage));
+            Assertions.assertTrue(areClose(actual, expected, withPercentage));
         }
     }
 
+    private static boolean areClose(Float actual, Float expected, double withPercentage) {
+        double lowerBound = expected * (1.0 - withPercentage / 100f);
+        double upperBound = expected * (1.0 + withPercentage / 100f);
+        return actual >= lowerBound && actual <= upperBound;
+    }
+
     public static void assertValuesMatch(List<Boolean> expectedValues, List<Boolean> actualValues) {
-        Assertions.assertThat(actualValues).hasSameSizeAs(expectedValues);
+        Assertions.assertEquals(actualValues.size(), expectedValues.size());
         for (int i = 0; i < expectedValues.size(); i++) {
             boolean expected = expectedValues.get(i);
             boolean actual = actualValues.get(i);
-            Assertions.assertThat(actual).isEqualTo(expected);
+            Assertions.assertEquals(expected, actual);
         }
     }
 

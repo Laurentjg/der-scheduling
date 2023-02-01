@@ -10,6 +10,16 @@ such that they can be referenced in the javadoc of the tests. A java IDE (
 e.g. [intelliJ](https://www.jetbrains.com/idea/)) will render this in a way that references can be followed
 bidirectionally.
 
+## License
+
+This test framework is licensed under Apache 2.0 license. It uses dependencies licensed under
+
+- Eclipse Public license 1.0
+- MIT license
+- Apache 2.0 license 
+
+see [NOTICE](NOTICE) for details.
+
 ## Running the tests
 
 The tests will later on run with JUnit, a common testing framework for java. They can be started by
@@ -34,6 +44,6 @@ and the
 general [IEC 61850 scheduling execution tests](tests/src/test/java/org/openmuc/fnn/steuerbox/ScheduleExecutionTest.java)
 , tests on existing IEC 61850
 nodes [of schedule controller](src/test/java/org/openmuc/fnn/steuerbox/ScheduleControllerNodeTests.java)
-and [schedule itself](src/test/java/org/openmuc/fnn/steuerbox/ScheduleNodeTests.java) and more
-[Alliander spcific tests](https://gitlab.cc-asp.fraunhofer.de/sgc_industry/alliander-rfg-conformance-tests/-/blob/main/src/test/java/org/openmuc/fnn/steuerbox/AllianderTests.java)
+and [schedule](src/test/java/org/openmuc/fnn/steuerbox/ScheduleNodeTests.java) and more
+[Alliander spcific tests](main/src/test/java/org/openmuc/fnn/steuerbox/AllianderTests.java)
 .
