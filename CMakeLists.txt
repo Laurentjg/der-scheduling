@@ -21,14 +21,15 @@ include_directories(${CMAKE_BINARY_DIR})
 # Find source files
 #file(GLOB SOURCES *.cpp)
 file(GLOB SOURCES ${CMAKE_CURRENT_LIST_DIR}/src/scheduler/*.c)
+file(GLOB STORAGE_SOURCES ${CMAKE_CURRENT_LIST_DIR}/src/scheduler/storage/*.c)
 
-message(STATUS ${SOURCES})
+message(STATUS ${SOURCES} ${STORAGE_SOURCES})
 
 # Add ./include
 include_directories(${CMAKE_CURRENT_LIST_DIR}/src/scheduler)
 
 # Create shared library
-add_library(der_scheduler STATIC ${SOURCES} version.h)
+add_library(der_scheduler STATIC ${SOURCES} ${STORAGE_SOURCES} version.h)
 
 set_target_properties(der_scheduler PROPERTIES LINKER_LANGUAGE C)
 
