@@ -1,3 +1,6 @@
+#ifndef _DER_SCHEDULER_INTERNAL_H
+#define _DER_SCHEDULER_INTERNAL_H
+
 #include "der_scheduler.h"
 
 #include <libiec61850/hal_thread.h>
@@ -5,6 +8,8 @@
 typedef struct sSchedule* Schedule;
 
 typedef struct sScheduleController* ScheduleController;
+
+typedef struct sSchedulerStorage* SchedulerStorage;
 
 typedef enum {
     SCHD_STATE_INVALID = 0,
@@ -85,6 +90,7 @@ struct sScheduler
     IedServer server;
     LinkedList scheduleController;
     LinkedList schedules;
+    SchedulerStorage storage;
 
     Scheduler_TargetValueChanged targetValueHandler;
     void* targetValueHandlerParameter;
@@ -149,3 +155,24 @@ Schedule_enableWriteAccessToStrTm(Schedule self, bool enable);
 
 void
 Schedule_enableWriteAccessToSchdReuse(Schedule self, bool enable);
+
+SchedulerStorage
+SchedulerStorage_init(const char* databaseUri, int numberOfParameters, const char** parameters);
+
+void
+SchedulerStorage_destroy(SchedulerStorage self);
+
+bool
+SchedulerStorage_saveSchedule(SchedulerStorage self, Schedule schedule);
+
+bool
+SchedulerStorage_restoreSchedule(SchedulerStorage self, Schedule schedule);
+
+bool
+SchedulerStorage_saveScheduleController(SchedulerStorage self, ScheduleController controller);
+
+bool
+SchedulerStorage_restoreScheduleController(SchedulerStorage self, ScheduleController controller);
+
+
+#endif /* _DER_SCHEDULER_INTERNAL_H */

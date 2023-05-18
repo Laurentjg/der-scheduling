@@ -1,3 +1,6 @@
+#ifndef _DER_SCHEDULER_H
+#define _DER_SCHEDULER_H
+
 #include <libiec61850/iec61850_server.h>
 
 typedef struct sScheduler* Scheduler;
@@ -11,6 +14,17 @@ typedef struct sScheduler* Scheduler;
  */
 Scheduler
 Scheduler_create(IedModel* model, IedServer server);
+
+/**
+ * @brief Set a storage instance to use to persist schedule data
+ * 
+ * @param self the scheduler instance
+ * @param databaseUri data base URI that are passed to the persistency layer
+ * @param numberOfParameter number of parameters that are passed to the persitency layer
+ * @param parameters parameters that are passed to the persistency layer
+*/
+void
+Scheduler_initializeStorage(Scheduler self, const char* databaseUri, int numberOfParameters, const char** parameters);
 
 /**
  * @brief Callback to receive notifications on target value changes
@@ -96,3 +110,5 @@ Scheduler_enableWriteAccessToParameter(Scheduler self, const char* scheduleRef, 
  */
 void
 Scheduler_destroy(Scheduler self);
+
+#endif /* _DER_SCHEDULER_H */

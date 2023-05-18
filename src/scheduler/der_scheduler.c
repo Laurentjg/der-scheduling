@@ -131,11 +131,53 @@ Scheduler_create(IedModel* model, IedServer server)
         self->server = server;
         self->scheduleController = LinkedList_create();
         self->schedules = LinkedList_create();
+        self->storage = NULL;
 
         scheduler_parseModel(self);
     }
 
     return self;
+}
+
+static void
+restoreSchedules(Scheduler self)
+{
+    printf("RESTORE SCHEDULES\n");
+
+    if (self->storage)
+    {
+        LinkedList schedElem = LinkedList_getNext(self->schedules);
+
+        while (schedElem)
+        {
+            Schedule sched = (Schedule)LinkedList_getData(schedElem);
+
+            SchedulerStorage_restoreSchedule(self->storage, sched);
+
+            schedElem = LinkedList_getNext(schedElem);
+        }
+    }
+}
+
+static void
+restoreScheduleControllers(Scheduler self)
+{
+    //TODO implement
+}
+
+void
+Scheduler_initializeStorage(Scheduler self, const char* databaseUri, int numberOfParameters, const char** parameters)
+{
+    if (self) {
+        if (self->storage) {
+            SchedulerStorage_destroy(self->storage);
+        }
+
+        self->storage = SchedulerStorage_init(databaseUri, numberOfParameters, parameters);
+
+        restoreSchedules(self);
+        restoreScheduleControllers(self);
+    }
 }
 
 void
