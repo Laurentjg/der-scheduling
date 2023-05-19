@@ -41,6 +41,24 @@ SchedulerStorage_destroy(SchedulerStorage self)
     }
 }
 
+static const char*
+getStringFromState(ScheduleState state)
+{
+    switch(state) {
+        case SCHD_STATE_NOT_READY:
+            return "not ready";
+        case SCHD_STATE_START_TIME_REQUIRED:
+            return "start time required";
+        case SCHD_STATE_READY:
+            return "ready";
+        case SCHD_STATE_RUNNING:
+            return "running";
+        case SCHD_STATE_INVALID:
+        default:
+            return "invalid";
+    }
+}
+
 static cJSON*
 createSchedule(Schedule schedule)
 {
@@ -56,6 +74,8 @@ createSchedule(Schedule schedule)
     cJSON_AddItemToObject(scheduleJson, "objRef", objRef);
 
     //TODO add "state"
+    cJSON* schdSt = cJSON_CreateString(getStringFromState(Schedule_getState(schedule)));
+    cJSON_AddItemToObject(scheduleJson, "state", schdSt);
 
     cJSON* reuse = cJSON_CreateBool(Schedule_getSchdReuse(schedule));
     cJSON_AddItemToObject(scheduleJson, "reuse", reuse);
@@ -134,7 +154,7 @@ createSchedule(Schedule schedule)
 
     cJSON_AddItemToObject(scheduleJson, "startTimes", startTimes);
     
-    char* jsonStr = cJSON_Print(scheduleJson);
+    char* jsonStr = cJSON_PrintUnformatted(scheduleJson);
 
     printf("\n%s\n", jsonStr);
 

@@ -146,6 +146,9 @@ Schedule_getCurrentValue(Schedule self);
 MmsValue*
 Schedule_getValueWithIdx(Schedule self, int idx);
 
+ScheduleState
+Schedule_getState(Schedule self);
+
 void
 Schedule_destroy(Schedule self);
 

@@ -256,6 +256,10 @@ Schedule_getStartTimes(Schedule self)
     LogicalNode* schedLn = self->scheduleLn;
 
     DataObject* dobj = (DataObject*)(schedLn->firstChild);
+
+    while (dobj) {
+
+    }
 }
 
 /**
@@ -1509,6 +1513,12 @@ Schedule_enableSchedule(Schedule self, bool enable)
 
         return true;
     }
+}
+
+ScheduleState
+Schedule_getState(Schedule self)
+{
+    return schedule_getState(self);
 }
 
 void
