@@ -250,6 +250,14 @@ schedule_getNextStartTime(Schedule self)
     return nextStartTime;
 }
 
+LinkedList
+Schedule_getStartTimes(Schedule self)
+{
+    LogicalNode* schedLn = self->scheduleLn;
+
+    DataObject* dobj = (DataObject*)(schedLn->firstChild);
+}
+
 /**
  * StrXX value has to be set to "00" when active
  */
@@ -1109,6 +1117,20 @@ Schedule_getCurrentValue(Schedule self)
     return currentValue;
 }
 
+MmsValue*
+Schedule_getValueWithIdx(Schedule self, int idx)
+{
+    MmsValue* value = NULL;
+
+    DataAttribute* valueAttr = schedule_getScheduleValueAttribute(self, idx + 1);
+
+    if (valueAttr) {
+        value = valueAttr->mmsValue;
+    }
+
+    return value;
+}
+
 static void*
 schedule_thread(void* parameter)
 {
@@ -1411,6 +1433,50 @@ Schedule_getPrio(Schedule self)
     }
 
     return prio;
+}
+
+bool
+Schedule_getSchdReuse(Schedule self)
+{
+    bool retVal = false;
+
+    DataAttribute* schdResue_setVal = (DataAttribute*)ModelNode_getChild((ModelNode*)(self->scheduleLn), "SchdReuse.setVal");
+
+    if (schdResue_setVal) {
+        if (schdResue_setVal->mmsValue && MmsValue_getType(schdResue_setVal->mmsValue) == MMS_BOOLEAN) {
+            retVal = MmsValue_getBoolean(schdResue_setVal->mmsValue);
+        }
+    }
+
+    return retVal;
+}
+
+int
+Schedule_getNumEntr(Schedule self)
+{
+    int numEntry = 0;
+
+    DataAttribute* numEntry_setVal = (DataAttribute*)ModelNode_getChild((ModelNode*)(self->scheduleLn), "NumEntr.setVal");
+
+    if (numEntry_setVal) {
+        if (numEntry_setVal->mmsValue && MmsValue_getType(numEntry_setVal->mmsValue) == MMS_INTEGER) {
+            numEntry = MmsValue_toInt32(numEntry_setVal->mmsValue);
+        }
+    }
+
+    return numEntry;
+}
+
+int
+Schedule_getValueCount(Schedule self)
+{
+    return schedule_getNumberOfScheduleEntries(self);
+}
+
+int
+Schedule_getSchdIntvInMs(Schedule self)
+{
+    return getSchdIntvValueInMs(self);
 }
 
 bool

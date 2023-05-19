@@ -1,5 +1,5 @@
 #include "der_scheduler_internal.h"
-#include "hal_thread.h"
+#include <libiec61850/hal_thread.h>
 
 #include "cJSON.h"
 
@@ -8,7 +8,7 @@
 struct sSchedulerStorage {
     char* filename; /* file name of the persistent database */
     cJSON* inMemoryDb; /* in-memory JSON database */
-    Semaphore inMemoryDbLock; /* in-memroy JSON database access control */
+    Semaphore inMemoryDbLock; /* in-memory JSON database access control */
 };
 
 SchedulerStorage
@@ -19,7 +19,7 @@ SchedulerStorage_init(const char* databaseUri, int numberOfParameters, const cha
     if (self) {
         self->filename = strdup(databaseUri);
         self->inMemoryDb = NULL;
-        self->inMemoryDbLock = Semaphore_create();
+        self->inMemoryDbLock = Semaphore_create(1);
     }
 
     return self;
@@ -41,12 +41,119 @@ SchedulerStorage_destroy(SchedulerStorage self)
     }
 }
 
+static cJSON*
+createSchedule(Schedule schedule)
+{
+    cJSON* scheduleJson = cJSON_CreateObject();
+
+    if (scheduleJson == NULL)
+        goto exit_error;
+
+    char schedRef[130];
+    ModelNode_getObjectReferenceEx((ModelNode*)schedule->scheduleLn, schedRef, true);
+
+    cJSON* objRef = cJSON_CreateString(schedRef);
+    cJSON_AddItemToObject(scheduleJson, "objRef", objRef);
+
+    //TODO add "state"
+
+    cJSON* reuse = cJSON_CreateBool(Schedule_getSchdReuse(schedule));
+    cJSON_AddItemToObject(scheduleJson, "reuse", reuse);
+
+    cJSON* prio = cJSON_CreateNumber((double)Schedule_getPrio(schedule));
+    cJSON_AddItemToObject(scheduleJson, "prio", prio);
+
+    cJSON* numEntr = cJSON_CreateNumber((double)(Schedule_getNumEntr(schedule)));
+    cJSON_AddItemToObject(scheduleJson, "numEntr", numEntr);
+
+    cJSON* schdIntv = cJSON_CreateNumber((double)(Schedule_getSchdIntvInMs(schedule)));
+    cJSON_AddItemToObject(scheduleJson, "schdIntv", schdIntv);
+
+    /* save values */
+    cJSON* values = cJSON_CreateArray();
+
+    int valueCount = Schedule_getValueCount(schedule);
+
+    for (int idx = 0; idx < valueCount; idx++) {
+        MmsValue* mmsValue = Schedule_getValueWithIdx(schedule, idx);
+
+        cJSON* value = NULL;
+
+        if (MmsValue_getType(mmsValue) == MMS_BOOLEAN) {
+            value = cJSON_CreateBool(MmsValue_getBoolean(mmsValue));
+        }
+        else if (MmsValue_getType(mmsValue) == MMS_FLOAT) {
+            value = cJSON_CreateNumber((double)MmsValue_toFloat(mmsValue));
+        }
+        else if (MmsValue_getType(mmsValue) == MMS_INTEGER) {
+            value = cJSON_CreateNumber((double)MmsValue_toInt32(mmsValue));
+        }
+
+        if (value) {
+            cJSON_AddItemToArray(values, value);
+        }
+    }
+
+    cJSON_AddItemToObject(scheduleJson, "values", values);
+
+    cJSON* startTimes = cJSON_CreateArray();
+
+    LogicalNode* schedLn = schedule->scheduleLn;
+
+    DataObject* dobj = (DataObject*)(schedLn->firstChild);
+
+    while (dobj) 
+    {
+        if (scheduler_checkIfMultiObjInst(dobj->name, "StrTm")) {
+
+            uint64_t timeVal = 0L;
+
+            DataAttribute* strTm_setTm = (DataAttribute*)ModelNode_getChild((ModelNode*)dobj, "setTm");
+
+            if (strTm_setTm) {
+                if (strTm_setTm->mmsValue && MmsValue_getType(strTm_setTm->mmsValue) == MMS_UTC_TIME) {
+                    timeVal = MmsValue_getUtcTimeInMs(strTm_setTm->mmsValue);
+                }
+            }
+
+            cJSON* strTm = cJSON_CreateObject();
+
+            cJSON* startTimeId = cJSON_CreateString(dobj->name);
+
+            cJSON_AddItemToObject(strTm, "id", startTimeId);
+
+            cJSON* startTimeT = cJSON_CreateNumber((double)timeVal);
+
+            cJSON_AddItemToObject(strTm, "t", startTimeT);
+
+            cJSON_AddItemToArray(startTimes, strTm);
+        }    
+
+        dobj = (DataObject*)(dobj->sibling);
+    }
+
+    cJSON_AddItemToObject(scheduleJson, "startTimes", startTimes);
+    
+    char* jsonStr = cJSON_Print(scheduleJson);
+
+    printf("\n%s\n", jsonStr);
+
+exit:
+    return scheduleJson;
+
+exit_error:
+    if (scheduleJson)
+        cJSON_Delete(scheduleJson);
+
+    return NULL;
+}
+
 static bool
 saveScheduleData(SchedulerStorage self, Schedule schedule)
 {
     char schedRef[130];
 
-    ModelNode_getObjectReferenceEx(schedule->scheduleLn, schedRef, true);
+    ModelNode_getObjectReferenceEx((ModelNode*)schedule->scheduleLn, schedRef, true);
 
     printf("Save schedule data for %s\n", schedRef);
 
@@ -81,7 +188,7 @@ getScheduleData(SchedulerStorage self, Schedule schedule)
 
     char schedRef[130];
 
-    ModelNode_getObjectReferenceEx(schedule->scheduleLn, schedRef, true);
+    ModelNode_getObjectReferenceEx((ModelNode*)schedule->scheduleLn, schedRef, true);
 
     printf("Restore schedule data for %s\n", schedRef);
 
@@ -124,7 +231,7 @@ SchedulerStorage_restoreSchedule(SchedulerStorage self, Schedule schedule)
 {
     getScheduleData(self, schedule);
 
-    saveScheduleData(self, schedule);
+    createSchedule(schedule);
 
     return true;
 }

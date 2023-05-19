@@ -50,6 +50,8 @@ struct sSchedule {
 
     uint64_t nextStartTime;
 
+    bool reuse; /* allows to reuse the schedule after execution */
+
     uint64_t startTime; /* start time of current schedule execution */
     int entryDurationInMs; /* duration of schedule entry in ms */
     int numberOfScheduleEntries; /* number of valid schedule entries */
@@ -124,10 +126,25 @@ int
 Schedule_getPrio(Schedule self);
 
 bool
+Schedule_getSchdReuse(Schedule self);
+
+int
+Schedule_getSchdIntvInMs(Schedule self);
+
+int
+Schedule_getNumEntr(Schedule self);
+
+int
+Schedule_getValueCount(Schedule self);
+
+bool
 Schedule_isRunning(Schedule self);
 
 MmsValue*
 Schedule_getCurrentValue(Schedule self);
+
+MmsValue*
+Schedule_getValueWithIdx(Schedule self, int idx);
 
 void
 Schedule_destroy(Schedule self);
