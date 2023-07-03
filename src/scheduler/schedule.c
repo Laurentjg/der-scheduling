@@ -511,10 +511,16 @@ strTm_writeAccessHandler(DataAttribute* dataAttribute, MmsValue* value, ClientCo
 
             printf("INFO: Write access to %s -> value accepted\n", objRefBuf);
 
-            return DATA_ACCESS_ERROR_SUCCESS;
+            IedServer_updateAttributeValue(self->server, dataAttribute, value);
+
+            if (self->storage) {
+                SchedulerStorage_saveSchedule(self->storage, self);
+            }
+
+            return DATA_ACCESS_ERROR_SUCCESS_NO_UPDATE;
         }
         else {
-            printf("WARN: Write access to %s -> invalid value\n", objRefBuf);
+            printf("WARN: Write access to %s -> invalid value (is: %llu current: %llu\n", objRefBuf, newStrTm, Hal_getTimeInMs());
 
             return DATA_ACCESS_ERROR_OBJECT_VALUE_INVALID;
         }
@@ -546,11 +552,29 @@ schdPrio_writeAccessHandler(DataAttribute* dataAttribute, MmsValue* value, Clien
             controllerElem = LinkedList_getNext(controllerElem);
         }
 
-        return DATA_ACCESS_ERROR_SUCCESS;
+        if (self->storage) {
+            SchedulerStorage_saveSchedule(self->storage, self);
+        }
+
+        return DATA_ACCESS_ERROR_SUCCESS_NO_UPDATE;
     }
     else {
         return DATA_ACCESS_ERROR_OBJECT_ACCESS_DENIED;
     }
+}
+
+static MmsDataAccessError
+schedule_genericWriteAccessHandler(DataAttribute* dataAttribute, MmsValue* value, ClientConnection connection, void* parameter)
+{
+    Schedule self = (Schedule)parameter;
+
+    IedServer_updateAttributeValue(self->server, dataAttribute, value);
+
+    if (self->storage) {
+        SchedulerStorage_saveSchedule(self->storage, self);
+    }
+
+    return DATA_ACCESS_ERROR_SUCCESS_NO_UPDATE;
 }
 
 static MmsDataAccessError
@@ -559,11 +583,54 @@ schdReuse_writeAccessHandler(DataAttribute* dataAttribute, MmsValue* value, Clie
     Schedule self = (Schedule)parameter;
 
     if (self->allowWriteToSchdReuse) {
-        return DATA_ACCESS_ERROR_SUCCESS;
+
+        IedServer_updateAttributeValue(self->server, dataAttribute, value);
+
+        if (self->storage) {
+            SchedulerStorage_saveSchedule(self->storage, self);
+        }
+
+        return DATA_ACCESS_ERROR_SUCCESS_NO_UPDATE;
     }
     else {
         return DATA_ACCESS_ERROR_OBJECT_ACCESS_DENIED;
     }
+}
+
+static MmsDataAccessError
+schdIntv_writeAccessHandler(DataAttribute* dataAttribute, MmsValue* value, ClientConnection connection, void* parameter)
+{
+    Schedule self = (Schedule)parameter;
+
+    printf("write access to schdIntv\n");
+
+    if (self->allowWriteToSchdIntv) {
+
+        IedServer_updateAttributeValue(self->server, dataAttribute, value);
+
+        if (self->storage) {
+            SchedulerStorage_saveSchedule(self->storage, self);
+        }
+
+        return DATA_ACCESS_ERROR_SUCCESS_NO_UPDATE;
+    }
+    else {
+        return DATA_ACCESS_ERROR_OBJECT_ACCESS_DENIED;
+    }
+}
+
+static MmsDataAccessError
+schdValue_writeAccessHandler(DataAttribute* dataAttribute, MmsValue* value, ClientConnection connection, void* parameter)
+{
+    Schedule self = (Schedule)parameter;
+
+    IedServer_updateAttributeValue(self->server, dataAttribute, value);
+
+    if (self->storage) {
+        SchedulerStorage_saveSchedule(self->storage, self);
+    }
+
+    return DATA_ACCESS_ERROR_SUCCESS_NO_UPDATE;
 }
 
 static bool
@@ -658,6 +725,34 @@ schedule_installWriteAccessHandlersForStrTm(Schedule self)
     LinkedList_destroyStatic(dataObjects);
 }
 
+static void
+schedule_installWriteAccessHandlersForValues(Schedule self)
+{
+    //TODO implement
+    int idx = 1;
+
+    while (true) {
+        DataAttribute* da = schedule_getScheduleValueAttribute(self, idx);
+
+        if (da) {
+            char objRef[130];
+
+            ModelNode_getObjectReference((ModelNode*)da, objRef);
+
+            printf("Install write handler for %s\n", objRef);
+
+            IedServer_handleWriteAccessForComplexAttribute(self->server, da, schdValue_writeAccessHandler, self);
+
+            idx++;
+        }
+        else {
+            printf("schedue write attribute not found for index %i\n", idx);
+
+            break;
+        }
+    }
+}
+
 static uint64_t 
 getStartTime(DataObject* strTm)
 {
@@ -699,6 +794,58 @@ hasSetCal(DataObject* dobj)
     }
     else {
         return false;
+    }
+}
+
+static void
+setSchdIntvValueInMs(Schedule self, uint64_t interval)
+{
+    int multiplierEnumValue = 0;
+
+    int baseTime = 1; /* 1 second */
+
+    double multiPl = 1.0;
+
+    DataAttribute* unit = (DataAttribute*)ModelNode_getChild((ModelNode*)self->scheduleLn, "SchdIntv.units.SIUnit");
+
+    if (unit) {
+        if ((unit->mmsValue) && (MmsValue_getType(unit->mmsValue) == MMS_INTEGER)) {
+            int unitEnumValue = MmsValue_toInt32(unit->mmsValue);
+
+            if (unitEnumValue == 4) { /* second */
+                baseTime = 1;
+            }
+            else if (unitEnumValue == 84) { /* hour */
+                baseTime = 3600;
+            }
+            else if (unitEnumValue == 85) { /* minute */
+                baseTime = 60;
+            }
+            else {
+                printf("ERROR: invalid unit %i (has to be a time unit)\n", unitEnumValue);
+            }
+        }
+    }
+
+    DataAttribute* multiplier = (DataAttribute*)ModelNode_getChild((ModelNode*)self->scheduleLn, "SchdIntv.units.multiplier");
+
+    if (multiplier) {
+        if ((multiplier->mmsValue) && (MmsValue_getType(multiplier->mmsValue) == MMS_INTEGER)) {
+            multiplierEnumValue = MmsValue_toInt32(multiplier->mmsValue);
+
+            multiPl = pow(10, multiplierEnumValue);
+        }
+    }
+
+    DataAttribute* schdIntv = (DataAttribute*)ModelNode_getChild((ModelNode*)self->scheduleLn, "SchdIntv.setVal");
+
+    if (schdIntv) {
+        if ((schdIntv->mmsValue) && (MmsValue_getType(schdIntv->mmsValue) == MMS_INTEGER)) {
+
+            double value = (double)interval / ((double)baseTime * 1000.0 * multiPl);
+
+            MmsValue_setInt32(schdIntv->mmsValue, (int)value);
+        }
     }
 }
 
@@ -1251,7 +1398,6 @@ schedule_thread(void* parameter)
     }
 }
 
-
 Schedule
 Schedule_create(LogicalNode* schedLn, IedServer server, IedModel* model)
 {
@@ -1261,8 +1407,6 @@ Schedule_create(LogicalNode* schedLn, IedServer server, IedModel* model)
     bool isSchedule = true;
 
     ScheduleTargetType targetType = SCHD_TYPE_UNKNOWN;
-
-    DataAttribute* schdPrio_setVal = NULL;
 
     ModelNode* schdSt = ModelNode_getChild((ModelNode*)schedLn, "SchdSt");
 
@@ -1278,19 +1422,11 @@ Schedule_create(LogicalNode* schedLn, IedServer server, IedModel* model)
         isSchedule = false;
     }
 
-    ModelNode* schdPrio = ModelNode_getChild((ModelNode*)schedLn, "SchdPrio");
+    DataAttribute* schdPrio_setVal = (DataAttribute*)ModelNode_getChild((ModelNode*)schedLn, "SchdPrio.setVal");
 
-    if (schdPrio == NULL) {
-        printf("SchdPrio not found in LN %s -> skip LN\n", schedLn->name);
+    if (schdPrio_setVal == NULL) {
+        printf("SchdPrio.setVal not found in LN %s -> skip LN\n", schedLn->name);
         isSchedule = false;
-    }
-    else {
-        schdPrio_setVal = (DataAttribute*)ModelNode_getChild(schdPrio, "setVal");
-
-        if (schdPrio_setVal == NULL) {
-            printf("SchdPrio.setVal not found in LN %s -> skip LN\n", schedLn->name);
-            isSchedule = false;
-        }
     }
 
     ModelNode* enaReq = ModelNode_getChild((ModelNode*)schedLn, "EnaReq");
@@ -1348,6 +1484,7 @@ Schedule_create(LogicalNode* schedLn, IedServer server, IedModel* model)
         self = (Schedule)calloc(1, sizeof(struct sSchedule));
 
         if (self && knownScheduleControllers) {
+            self->storage = NULL;
             self->scheduleLn = schedLn;
             self->server = server;
             self->model = model;
@@ -1377,7 +1514,21 @@ Schedule_create(LogicalNode* schedLn, IedServer server, IedModel* model)
                 IedServer_handleWriteAccess(self->server, (DataAttribute*)schdResue_setVal, schdReuse_writeAccessHandler, self);
             }
 
+            DataAttribute* schdIntv_setVal = (DataAttribute*)ModelNode_getChild((ModelNode*)self->scheduleLn, "SchdIntv.setVal");
+
+            if (schdIntv_setVal) {
+                IedServer_handleWriteAccess(self->server, schdIntv_setVal, schdIntv_writeAccessHandler, self);
+            }
+    
+            DataAttribute* numEntr_setVal = (DataAttribute*)ModelNode_getChild((ModelNode*)self->scheduleLn, "NumEntr.setVal");
+
+            if (numEntr_setVal) {
+                IedServer_handleWriteAccess(self->server, numEntr_setVal, schedule_genericWriteAccessHandler, self);
+            }
+
             schedule_installWriteAccessHandlersForStrTm(self);
+
+            schedule_installWriteAccessHandlersForValues(self);
 
             IedServer_setPerformCheckHandler(self->server, self->dsaReq, schedule_performCheckHandler, self);
             IedServer_setPerformCheckHandler(self->server, self->enaReq, schedule_performCheckHandler, self);
@@ -1397,6 +1548,7 @@ Schedule_create(LogicalNode* schedLn, IedServer server, IedModel* model)
             self->allowWriteToSchdPrio = true;
             self->allowWriteToStrTm = true;
             self->allowWriteToSchdReuse = true;
+            self->allowWriteToSchdIntv = true;
 
             Thread_start(self->thread);
         }
@@ -1439,20 +1591,43 @@ Schedule_getPrio(Schedule self)
     return prio;
 }
 
+void
+Schedule_setPrio(Schedule self, int value)
+{
+    DataAttribute* schdPrio_setVal = (DataAttribute*)ModelNode_getChild((ModelNode*)self->scheduleLn, "SchdPrio.setVal");
+
+    if (schdPrio_setVal && schdPrio_setVal->mmsValue) {
+        MmsValue_setInt32(schdPrio_setVal->mmsValue, value);
+    }
+    else {
+        printf("Schedule_setPrio: failed\n");
+    }
+}
+
 bool
 Schedule_getSchdReuse(Schedule self)
 {
     bool retVal = false;
 
-    DataAttribute* schdResue_setVal = (DataAttribute*)ModelNode_getChild((ModelNode*)(self->scheduleLn), "SchdReuse.setVal");
+    DataAttribute* schdReuse_setVal = (DataAttribute*)ModelNode_getChild((ModelNode*)(self->scheduleLn), "SchdReuse.setVal");
 
-    if (schdResue_setVal) {
-        if (schdResue_setVal->mmsValue && MmsValue_getType(schdResue_setVal->mmsValue) == MMS_BOOLEAN) {
-            retVal = MmsValue_getBoolean(schdResue_setVal->mmsValue);
+    if (schdReuse_setVal) {
+        if (schdReuse_setVal->mmsValue && MmsValue_getType(schdReuse_setVal->mmsValue) == MMS_BOOLEAN) {
+            retVal = MmsValue_getBoolean(schdReuse_setVal->mmsValue);
         }
     }
 
     return retVal;
+}
+
+void
+Schedule_setSchdReuse(Schedule self, bool reuse)
+{
+    DataAttribute* schdReuse_setVal = (DataAttribute*)ModelNode_getChild((ModelNode*)(self->scheduleLn), "SchdReuse.setVal");
+
+    if (schdReuse_setVal && schdReuse_setVal->mmsValue) {
+        MmsValue_setBoolean(schdReuse_setVal->mmsValue, reuse);
+    }
 }
 
 int
@@ -1471,6 +1646,16 @@ Schedule_getNumEntr(Schedule self)
     return numEntry;
 }
 
+void
+Schedule_setNumEntr(Schedule self, int numEntry)
+{
+     DataAttribute* numEntry_setVal = (DataAttribute*)ModelNode_getChild((ModelNode*)(self->scheduleLn), "NumEntr.setVal");
+
+    if (numEntry_setVal && numEntry_setVal->mmsValue) {
+        MmsValue_setInt32(numEntry_setVal->mmsValue, numEntry);
+    }
+}
+
 int
 Schedule_getValueCount(Schedule self)
 {
@@ -1481,6 +1666,12 @@ int
 Schedule_getSchdIntvInMs(Schedule self)
 {
     return getSchdIntvValueInMs(self);
+}
+
+void
+Schedule_setSchIntvInMs(Schedule self, int value)
+{
+    setSchdIntvValueInMs(self, value);
 }
 
 bool
@@ -1519,6 +1710,18 @@ ScheduleState
 Schedule_getState(Schedule self)
 {
     return schedule_getState(self);
+}
+
+void
+Schedule_setReuse(Schedule self, bool resue)
+{
+    self->reuse = true;
+}
+
+void
+Schedule_setState(Schedule self, ScheduleState state)
+{
+    schedule_udpateState(self, state);
 }
 
 void

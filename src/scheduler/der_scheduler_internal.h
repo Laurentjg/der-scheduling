@@ -40,6 +40,7 @@ typedef enum {
 struct sSchedule {
     LogicalNode* scheduleLn;
     ScheduleTargetType targetType;
+    SchedulerStorage storage;
 
     DataObject* enaReq;
     DataObject* dsaReq;
@@ -67,6 +68,7 @@ struct sSchedule {
     bool allowWriteToSchdPrio;
     bool allowWriteToStrTm;
     bool allowWriteToSchdReuse;
+    bool allowWriteToSchdIntv;
 
     bool isTimeTriggerd; /* when the schedule has at least one StrTm object */
     bool isPeriodic;     /* when the schedule has at least one StrTm object with a setCal attribute */
@@ -125,14 +127,26 @@ Schedule_create(LogicalNode* schedLn, IedServer server, IedModel* model);
 int
 Schedule_getPrio(Schedule self);
 
+void
+Schedule_setPrio(Schedule self, int value);
+
 bool
 Schedule_getSchdReuse(Schedule self);
+
+void
+Schedule_setSchdReuse(Schedule self, bool reuse);
 
 int
 Schedule_getSchdIntvInMs(Schedule self);
 
+void
+Schedule_setSchIntvInMs(Schedule self, int value);
+
 int
 Schedule_getNumEntr(Schedule self);
+
+void
+Schedule_setNumEntr(Schedule self, int numEntry);
 
 int
 Schedule_getValueCount(Schedule self);
@@ -148,6 +162,9 @@ Schedule_getValueWithIdx(Schedule self, int idx);
 
 ScheduleState
 Schedule_getState(Schedule self);
+
+void
+Schedule_setState(Schedule self, ScheduleState state);
 
 void
 Schedule_destroy(Schedule self);

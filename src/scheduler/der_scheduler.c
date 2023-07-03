@@ -175,6 +175,16 @@ Scheduler_initializeStorage(Scheduler self, const char* databaseUri, int numberO
 
         self->storage = SchedulerStorage_init(databaseUri, numberOfParameters, parameters);
 
+        LinkedList scheduleElem = LinkedList_getNext(self->schedules);
+
+        while (scheduleElem) {
+            Schedule schedule = (Schedule)LinkedList_getData(scheduleElem);
+
+            schedule->storage = self->storage;
+
+            scheduleElem = LinkedList_getNext(scheduleElem);
+        }
+
         restoreSchedules(self);
         restoreScheduleControllers(self);
     }
