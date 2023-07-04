@@ -142,8 +142,6 @@ Scheduler_create(IedModel* model, IedServer server)
 static void
 restoreSchedules(Scheduler self)
 {
-    printf("RESTORE SCHEDULES\n");
-
     if (self->storage)
     {
         LinkedList schedElem = LinkedList_getNext(self->schedules);
@@ -162,7 +160,18 @@ restoreSchedules(Scheduler self)
 static void
 restoreScheduleControllers(Scheduler self)
 {
-    //TODO implement
+    if (self->storage)
+    {
+        LinkedList controllerElem = LinkedList_getNext(self->scheduleController);
+
+        while (controllerElem) {
+            ScheduleController controller = (ScheduleController)LinkedList_getData(controllerElem);
+
+            SchedulerStorage_restoreScheduleController(self->storage, controller);
+
+            controllerElem = LinkedList_getNext(controllerElem);
+        }
+    }
 }
 
 void
@@ -183,6 +192,16 @@ Scheduler_initializeStorage(Scheduler self, const char* databaseUri, int numberO
             schedule->storage = self->storage;
 
             scheduleElem = LinkedList_getNext(scheduleElem);
+        }
+
+        LinkedList controllerElem = LinkedList_getNext(self->scheduleController);
+
+        while (controllerElem) {
+            ScheduleController controller = (ScheduleController)LinkedList_getData(controllerElem);
+
+            controller->storage = self->storage;
+
+            controllerElem = LinkedList_getNext(controllerElem);
         }
 
         restoreSchedules(self);

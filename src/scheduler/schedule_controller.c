@@ -387,6 +387,111 @@ scheduleController_lookUpTargetObject(ScheduleController self, const char* targe
     return NULL;
 }
 
+static int
+scheduleController_getNumberOfScheduleReferences(ScheduleController self)
+{
+    int scheduleRefCount = 0;
+
+    LinkedList dataObjects = ModelNode_getChildren((ModelNode*)self->controllerLn);
+
+    LinkedList doElem = LinkedList_getNext(dataObjects);
+
+    while (doElem) {
+        DataObject* dObj = (DataObject*)LinkedList_getData(doElem);
+
+        if (scheduler_checkIfMultiObjInst(dObj->name, "Schd")) {
+            scheduleRefCount++;
+        }
+
+        doElem = LinkedList_getNext(doElem);
+    }
+
+    LinkedList_destroyStatic(dataObjects);
+
+    printf("INFO: ScheduleController has %i Schd references\n", scheduleRefCount);
+
+    return scheduleRefCount;
+}
+
+DataAttribute*
+ScheduleController_getScheduleReferenceWithIdx(ScheduleController self, int idx)
+{
+    idx++;
+
+    DataAttribute* valueAttr = NULL;
+
+    char attrNameBuf[100];
+
+    char* multiObjStr = "Schd";
+
+    sprintf(attrNameBuf, "%s%i.setSrcRef", multiObjStr, idx);
+    valueAttr = (DataAttribute*)ModelNode_getChild((ModelNode*)self->controllerLn, attrNameBuf);
+
+    if (valueAttr == NULL) {
+        sprintf(attrNameBuf, "%s%02i.setSrcRef", multiObjStr, idx);
+        valueAttr = (DataAttribute*)ModelNode_getChild((ModelNode*)self->controllerLn, attrNameBuf);
+    }
+
+    if (valueAttr == NULL) {
+        sprintf(attrNameBuf, "%s%03i.setSrcRef", multiObjStr, idx);
+        valueAttr = (DataAttribute*)ModelNode_getChild((ModelNode*)self->controllerLn, attrNameBuf);
+    }
+
+    if (valueAttr == NULL) {
+        sprintf(attrNameBuf, "%s%04i.setSrcRef", multiObjStr, idx);
+        valueAttr = (DataAttribute*)ModelNode_getChild((ModelNode*)self->controllerLn, attrNameBuf);
+    };
+
+    return valueAttr;
+}
+
+void
+ScheduleController_setCtlEnt(ScheduleController self, const char* ctlEntValue)
+{
+    DataAttribute* ctlEnt_setSrcRef = (DataAttribute*)ModelNode_getChild((ModelNode*)self->controllerLn, "CtlEnt.setSrcRef");
+
+    if (ctlEnt_setSrcRef) {
+        ModelNode* targetObject = scheduleController_lookUpTargetObject(self, ctlEntValue);
+
+        if (targetObject) {
+            MmsValue_setVisibleString(ctlEnt_setSrcRef->mmsValue, ctlEntValue);
+        }
+        else {
+            printf("ERROR: ScheduleController_setCtlEnt - target object %s not found!\n", ctlEntValue);
+        }
+    }
+    else {
+        printf("ERROR: ScheduleController_setCtlEnt - CtlEnt.setSrcRef not found!\n");
+    }
+
+}
+
+bool
+ScheduleController_setSchdRef(ScheduleController self, const char* id, const char* ref)
+{
+    DataAttribute* schd = (DataAttribute*)ModelNode_getChild((ModelNode*)self->controllerLn, id);
+
+    if (schd) {
+        DataAttribute* schd_setSrcRef = (DataAttribute*)ModelNode_getChild((ModelNode*)schd, "setSrcRef");
+
+        if (schd_setSrcRef) {
+            MmsValue_setVisibleString(schd_setSrcRef->mmsValue, ref);
+        }
+        else {
+            printf("ERROR: schedule reference %s not found in schedule controller\n", ref);
+
+            return false;
+        }
+    }
+    else {
+        printf("ERROR: schedule reference %s not found in schedule controller\n", ref);
+
+        return false;
+    }
+
+    return true;
+}
+
 static MmsDataAccessError
 ctlEnt_setSrcRef_writeAccessHandler(DataAttribute* dataAttribute, MmsValue* value, ClientConnection connection, void* parameter)
 {
@@ -398,7 +503,6 @@ ctlEnt_setSrcRef_writeAccessHandler(DataAttribute* dataAttribute, MmsValue* valu
     ModelNode* targetObject = scheduleController_lookUpTargetObject(self, targetRef);
 
     if (targetObject) {
-        //TODO set targetObject
         self->controlEntity = targetObject;
         printf("INFO: control entity set: %s\n", targetRef);
     }
@@ -408,7 +512,13 @@ ctlEnt_setSrcRef_writeAccessHandler(DataAttribute* dataAttribute, MmsValue* valu
         return DATA_ACCESS_ERROR_OBJECT_VALUE_INVALID;
     }
 
-    return DATA_ACCESS_ERROR_SUCCESS;
+    IedServer_updateAttributeValue(self->server, dataAttribute, value);
+
+    if (self->storage) {
+        SchedulerStorage_saveScheduleController(self->storage, self);
+    }
+
+    return DATA_ACCESS_ERROR_SUCCESS_NO_UPDATE;
 }
 
 static MmsDataAccessError
@@ -455,8 +565,20 @@ schd_setSrcRef_writeAccessHandler(DataAttribute* dataAttribute, MmsValue* value,
     LinkedList_add(self->schedules, sched);
 
     Schedule_setListeningController(sched, self);
+
+    IedServer_updateAttributeValue(self->server, dataAttribute, value);
+
+    if (self->storage) {
+        SchedulerStorage_saveScheduleController(self->storage, self);
+    }
     
-    return DATA_ACCESS_ERROR_SUCCESS;
+    return DATA_ACCESS_ERROR_SUCCESS_NO_UPDATE;
+}
+
+int
+ScheduleController_getRefCount(ScheduleController self)
+{
+    return scheduleController_getNumberOfScheduleReferences(self);
 }
 
 void

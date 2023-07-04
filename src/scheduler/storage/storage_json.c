@@ -74,14 +74,8 @@ writeStringToFile(const char* filename, const char* str)
 }
 
 static char*
-getFilenameForSchedule(Schedule schedule, char* buffer)
+convertObjRefToFilename(const char* objRef, char* buffer)
 {
-    char objRef[130];
-
-    ModelNode_getObjectReferenceEx((ModelNode*)schedule->scheduleLn, objRef, false);
-
-    printf("objRef  : %s\n", objRef);
-
     /* convert "." to "_" and "/" to "_" */
     int pos = 0;
     int outPos = 0;
@@ -109,6 +103,30 @@ getFilenameForSchedule(Schedule schedule, char* buffer)
     buffer[outPos++] = 0;
 
     printf("filename: %s\n", buffer);
+}
+
+static char*
+getFilenameForSchedule(Schedule schedule, char* buffer)
+{
+    char objRef[130];
+
+    ModelNode_getObjectReferenceEx((ModelNode*)schedule->scheduleLn, objRef, false);
+
+    printf("objRef  : %s\n", objRef);
+
+    return convertObjRefToFilename(objRef, buffer);
+}
+
+static char*
+getFilenameForScheduleController(ScheduleController controller, char* buffer)
+{
+    char objRef[130];
+
+    ModelNode_getObjectReferenceEx((ModelNode*)controller->controllerLn, objRef, false);
+
+    printf("objRef  : %s\n", objRef);
+
+    return convertObjRefToFilename(objRef, buffer);
 }
 
 SchedulerStorage
@@ -172,6 +190,61 @@ getStateFromString(const char* stateStr)
         return SCHD_STATE_RUNNING;
     else
         return SCHD_STATE_INVALID;
+}
+
+static cJSON*
+createScheduleController(ScheduleController controller)
+{
+    cJSON* controllerJson = cJSON_CreateObject();
+
+    if (controllerJson == NULL)
+        goto exit_error;
+
+    char controllerRef[130];
+    ModelNode_getObjectReferenceEx((ModelNode*)controller->controllerLn, controllerRef, true);
+
+    cJSON* objRef = cJSON_CreateString(controllerRef);
+    cJSON_AddItemToObject(controllerJson, "objRef", objRef);
+
+    /* CtlEnt.setSrcRef */
+    DataAttribute* ctlEnt_setSrcRef = (DataAttribute*)ModelNode_getChild((ModelNode*)controller->controllerLn, "CtlEnt.setSrcRef");
+
+    if (ctlEnt_setSrcRef) {
+        cJSON* ctlEnt = cJSON_CreateString(MmsValue_toString(ctlEnt_setSrcRef->mmsValue));
+        cJSON_AddItemToObject(controllerJson, "ctlEnt", ctlEnt);
+    }
+
+    /* save references */
+    cJSON* schedules = cJSON_CreateArray();
+
+    int refCount = ScheduleController_getRefCount(controller);
+
+    for (int idx = 0; idx < refCount; idx++) {
+        DataAttribute* refAttr = ScheduleController_getScheduleReferenceWithIdx(controller, idx);
+
+        if (refAttr) {
+            cJSON* schdRef = cJSON_CreateObject();
+            
+            cJSON* refId = cJSON_CreateString(refAttr->parent->name);
+            cJSON_AddItemToObject(schdRef, "id", refId);
+
+            cJSON* refSchd = cJSON_CreateString(MmsValue_toString(refAttr->mmsValue));
+            cJSON_AddItemToObject(schdRef, "ref", refSchd);
+
+            cJSON_AddItemToArray(schedules, schdRef);
+        }
+    }
+
+    cJSON_AddItemToObject(controllerJson, "schedules", schedules);
+
+exit:
+    return controllerJson;
+
+exit_error:
+    if (controllerJson)
+        cJSON_Delete(controllerJson);
+
+    return NULL;
 }
 
 static cJSON*
@@ -342,6 +415,144 @@ SchedulerStorage_saveSchedule(SchedulerStorage self, Schedule schedule)
     return true;
 }
 
+bool
+SchedulerStorage_saveScheduleController(SchedulerStorage self, ScheduleController controller)
+{
+    printf("Save schedule controller\n");
+
+    char filename[200];
+    getFilenameForScheduleController(controller, filename);
+
+    cJSON* controllerJson = createScheduleController(controller);
+
+    if (controllerJson) {
+        char* jsonStr = cJSON_PrintUnformatted(controllerJson);
+
+        cJSON_Delete(controllerJson);
+
+        if (jsonStr) {
+            writeStringToFile(filename, jsonStr);
+
+            free(jsonStr);
+        }
+        else {
+            printf("ERROR: failed to write schedule controller to file %s\n", filename);
+
+            return false;
+        }
+    }
+    else {
+        printf("ERROR: Failed to convert schedule controller to json\n");
+
+        return false;
+    }
+
+    return true;
+}
+
+static bool
+getScheduleControllerData(SchedulerStorage self, ScheduleController controller, const char* controllerJsonStr)
+{
+    char controllerRef[130];
+
+    ModelNode_getObjectReferenceEx((ModelNode*)controller->controllerLn, controllerRef, true);
+
+    printf("Restore schedule controller data for %s\n", controllerRef);
+
+    cJSON* json = cJSON_Parse(controllerJsonStr);
+
+    if (json == NULL)
+    {
+        printf("Failed to parse schedule controller\n");
+
+        return false;
+    }
+
+    cJSON* objRef = cJSON_GetObjectItem(json, "objRef");
+
+    if (objRef == NULL) {
+        printf("JSON-DB(ERROR): No objRef in schedule\n");
+
+        cJSON_Delete(json);
+
+        return false;
+    }
+
+    if (cJSON_IsString(objRef) == false) {
+        printf("JSON-DB(ERROR): objRef has invalid type\n");
+
+        cJSON_Delete(json);
+
+        return false;
+    }
+
+    cJSON* ctlEnt = cJSON_GetObjectItem(json, "ctlEnt");
+
+    if (ctlEnt == NULL) {
+        printf("JSON-DB(ERROR): No ctlEnt in schedule\n");
+
+        cJSON_Delete(json);
+
+        return false;
+    }
+
+    if (cJSON_IsString(ctlEnt) == false) {
+        printf("JSON-DB(ERROR): ctlEnt has invalid type\n");
+
+        cJSON_Delete(json);
+
+        return false;
+    }
+
+    ScheduleController_setCtlEnt(controller, ctlEnt->valuestring);
+
+    cJSON* schedules = cJSON_GetObjectItem(json, "schedules");
+
+    if (schedules == NULL) {
+        printf("JSON-DB(ERROR): No schedules in schedule controller\n");
+
+        cJSON_Delete(json);
+
+        return false;
+    }
+
+    if (cJSON_IsArray(schedules) == false) {
+        printf("JSON-DB(ERROR): No schedules is not an array\n");
+
+        cJSON_Delete(json);
+
+        return false;
+    }
+
+    int valueCount = cJSON_GetArraySize(schedules);
+
+    printf("  found %i schedule references\n", valueCount);
+
+    for (int i = 0; i < valueCount; i++) {
+        cJSON* schedule = cJSON_GetArrayItem(schedules, i);
+    
+        if (schedule) {
+            cJSON* scheduleId = cJSON_GetObjectItem(schedule, "id");
+
+            cJSON* scheduleRef = cJSON_GetObjectItem(schedule, "ref");
+
+            if (scheduleId && scheduleRef) {
+                if (cJSON_IsString(scheduleId) && cJSON_IsString(scheduleRef)) {
+                    ScheduleController_setSchdRef(controller, scheduleId->valuestring, scheduleRef->valuestring);
+                }
+                else {
+                    printf("JSON-DB(ERROR): Schedule id or ref of wrong type\n");
+                }
+            }
+            else {
+                printf("JSON-DB(ERROR): Schedule is missing id or ref\n");
+            }
+        }
+    }
+
+    return true;
+}
+
 static bool
 getScheduleData(SchedulerStorage self, Schedule schedule, const char* scheduleJsonStr)
 {
@@ -351,15 +562,11 @@ getScheduleData(SchedulerStorage self, Schedule schedule, const char* scheduleJs
 
     printf("Restore schedule data for %s\n", schedRef);
 
-    char filename[200];
-
-    getFilenameForSchedule(schedule, filename);
-
     cJSON* json = cJSON_Parse(scheduleJsonStr);
 
     if (json == NULL)
     {
-        printf("Failed to lookup schedule\n");
+        printf("Failed to parse schedule\n");
 
         return false;
     }
@@ -506,6 +713,14 @@ getScheduleData(SchedulerStorage self, Schedule schedule, const char* scheduleJs
         return false;
     }
 
+    if (cJSON_IsArray(values) == false) {
+        printf("JSON-DB(ERROR): No values is not an array\n");
+
+        cJSON_Delete(json);
+
+        return false;
+    }
+
     int valueCount = cJSON_GetArraySize(values);
 
     printf("  found %i values\n", valueCount);
@@ -609,17 +824,41 @@ SchedulerStorage_restoreSchedule(SchedulerStorage self, Schedule schedule)
 }
 
 bool
-SchedulerStorage_saveScheduleController(SchedulerStorage self, ScheduleController controller)
-{
-    //TODO implement me
-
-    return true;
-}
-
-bool
 SchedulerStorage_restoreScheduleController(SchedulerStorage self, ScheduleController controller)
 {
-    //TODO implement me
+    cJSON* scheduleJson = NULL;
+
+    char filename[200];
+    getFilenameForScheduleController(controller, filename);
+
+    char* buffer = readFileToBuffer(filename);
+
+    if (buffer == NULL) {
+        scheduleJson = createScheduleController(controller);
+
+        char* jsonStr = cJSON_PrintUnformatted(scheduleJson);
+
+        if (jsonStr) {
+            writeStringToFile(filename, jsonStr);
+
+            free(jsonStr);
+        }
+        else {
+            printf("ERROR: failed to write schedule controller to file %s\n", filename);
+        }
+    }
+    else {
+        scheduleJson = cJSON_Parse(buffer);
+        free(buffer);
+    }
+
+    if (scheduleJson) {
+        char* jsonStr = cJSON_Print(scheduleJson);
+
+        getScheduleControllerData(self, controller, jsonStr);
+
+        cJSON_Delete(scheduleJson);
+    }
 
     return true;
 }

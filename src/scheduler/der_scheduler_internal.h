@@ -79,6 +79,7 @@ struct sSchedule {
 struct sScheduleController {
     Schedule activeSchedule;
     LinkedList schedules;
+    SchedulerStorage storage;
 
     LogicalNode* controllerLn;
     IedServer server;
@@ -108,6 +109,18 @@ ScheduleController_create(LogicalNode* fsccLn, Scheduler scheduler);
 
 void
 ScheduleController_destroy(ScheduleController self);
+
+int
+ScheduleController_getRefCount(ScheduleController self);
+
+DataAttribute*
+ScheduleController_getScheduleReferenceWithIdx(ScheduleController self, int idx);
+
+void
+ScheduleController_setCtlEnt(ScheduleController self, const char* ctlEntValue);
+
+bool
+ScheduleController_setSchdRef(ScheduleController self, const char* id, const char* ref);
 
 void
 scheduleController_schedulePrioUpdated(ScheduleController self, Schedule sched, int newPrio);
