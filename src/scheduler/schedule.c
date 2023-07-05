@@ -102,6 +102,10 @@ schedule_setState(Schedule self, ScheduleState newState)
 
     IedServer_unlockDataModel(self->server);
 
+    if (self->storage) {
+        SchedulerStorage_saveSchedule(self->storage, self);
+    }
+
     /* send PRIO_UPDATED event to schedule controller(s) */
 
     LinkedList controllerElem = LinkedList_getNext(self->knownScheduleControllers);
@@ -728,7 +732,6 @@ schedule_installWriteAccessHandlersForStrTm(Schedule self)
 static void
 schedule_installWriteAccessHandlersForValues(Schedule self)
 {
-    //TODO implement
     int idx = 1;
 
     while (true) {
@@ -738,8 +741,6 @@ schedule_installWriteAccessHandlersForValues(Schedule self)
             char objRef[130];
 
             ModelNode_getObjectReference((ModelNode*)da, objRef);
-
-            printf("Install write handler for %s\n", objRef);
 
             IedServer_handleWriteAccessForComplexAttribute(self->server, da, schdValue_writeAccessHandler, self);
 
@@ -1672,6 +1673,8 @@ void
 Schedule_setSchIntvInMs(Schedule self, int value)
 {
     setSchdIntvValueInMs(self, value);
+
+    self->entryDurationInMs = value;
 }
 
 bool

@@ -53,7 +53,7 @@ main(int argc, char** argv)
 
         MmsValue_delete(strTmVal);
 
-        strTmVal = MmsValue_newUtcTimeByMsTime(Hal_getTimeInMs() + 25000);
+        strTmVal = MmsValue_newUtcTimeByMsTime(Hal_getTimeInMs() + 15000);
 
         IedConnection_writeObject(con, &err, "DER_Scheduler_Control/ActPow_FSCH01.StrTm02.setTm", IEC61850_FC_SP, strTmVal);
 
@@ -63,7 +63,7 @@ main(int argc, char** argv)
 
         MmsValue_delete(strTmVal);
 
-        strTmVal = MmsValue_newUtcTimeByMsTime(Hal_getTimeInMs() + 45000);
+        strTmVal = MmsValue_newUtcTimeByMsTime(Hal_getTimeInMs() + 25000);
 
         IedConnection_writeObject(con, &err, "DER_Scheduler_Control/ActPow_FSCH01.StrTm03.setTm", IEC61850_FC_SP, strTmVal);
 

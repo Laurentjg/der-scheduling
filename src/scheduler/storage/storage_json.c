@@ -609,12 +609,6 @@ getScheduleData(SchedulerStorage self, Schedule schedule, const char* scheduleJs
         return false;
     }
 
-    ScheduleState schedState = getStateFromString(state->valuestring);
-
-    //printf("  state: %s(%i)\n", state->valuestring, schedState);
-
-    Schedule_setState(schedule, schedState);
-
     cJSON* reuse = cJSON_GetObjectItem(json, "reuse");
 
     if (reuse == NULL) {
@@ -703,6 +697,8 @@ getScheduleData(SchedulerStorage self, Schedule schedule, const char* scheduleJs
 
     Schedule_setSchIntvInMs(schedule, schdIntv->valueint);
 
+    printf("Schedule_setSchIntvInMs(after): %i json:%i\n", schedule->entryDurationInMs, schdIntv->valueint);
+
     cJSON* values = cJSON_GetObjectItem(json, "values");
 
     if (values == NULL) {
@@ -765,9 +761,25 @@ getScheduleData(SchedulerStorage self, Schedule schedule, const char* scheduleJs
                 if (id) {
                     cJSON* t = cJSON_GetObjectItem(startTime, "t");
 
-                    int tValue = t ? t->valueint : 0;
+                    uint64_t tValue = t ? (uint64_t)t->valuedouble : (uint64_t)0;
 
-                   // printf("    %s: %i\n", id->valuestring, tValue);
+                    DataAttribute* strTm = (DataAttribute*)ModelNode_getChild((ModelNode*)schedule->scheduleLn, id->valuestring);
+
+                    if (strTm) {
+                         DataAttribute* strTm_setTm = (DataAttribute*)ModelNode_getChild((ModelNode*)strTm, "setTm");
+
+                        if (strTm_setTm) {
+                            if (strTm_setTm->mmsValue && MmsValue_getType(strTm_setTm->mmsValue) == MMS_UTC_TIME) {
+                                MmsValue_setUtcTimeMs(strTm_setTm->mmsValue, tValue);
+                            }
+                        }
+                        else {
+                            printf("ERROR: Start time %s has no setTm attribute\n", id->valuestring);
+                        }
+                    }
+                    else {
+                        printf("ERROR: Start time %s not found\n", id->valuestring);
+                    }
                 }
                 else {
                     printf("     ERROR: start time %i has no id\n", i);
@@ -776,7 +788,10 @@ getScheduleData(SchedulerStorage self, Schedule schedule, const char* scheduleJs
         }
     }
 
-    //TODO read other schedule components!
+    /* update schedule state as the last step to ensure that all schedule data is already available
+       when schedule is about to run */
+    ScheduleState schedState = getStateFromString(state->valuestring);
+    Schedule_setState(schedule, schedState);
 
     cJSON_Delete(json);
 
