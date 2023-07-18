@@ -15,7 +15,7 @@ IEC scheduling solves two structural problems in controling complex energy syste
 
 **Problem 1**: There are many controls from remote, and in the local device itself. How do I get myself into control what is happening with all those loose controls? Otherwise, I won't understand the behavior and lose control.
 
-![Several actors with several capacity envelopes](../src/readme_totalenvelopes.png)
+![Several actors with several capacity envelopes](./images/readme_totalenvelopes.png)
 
 
 **Answer**: IEC scheduling completely changes the concept of controlling, compared to what is known till sofar in the IEC landscape for energy automation. The main principle of it is to place ALL controls into parallell schedules and where a policy defines the priority of those schedules. There are NO direct controls. All controls, even locally generated are placed in (separate) schedules. Included in defining this policy is to give priority to schedules dependent on situational circumstances, such as:
@@ -23,12 +23,12 @@ IEC scheduling solves two structural problems in controling complex energy syste
 2. (Internet)communication is down, so slowly move towards pre-defined (safe) schedules.
 3. Voltage is too high, so curtailment of infeed get priority (and parallel simulate with HEMS to use more energy locally)
 
-![Several actors with several IEC-schedules](../src/readme_totalschedules.png)
+![Several actors with several IEC-schedules](./images/readme_totalschedules.png)
 
 **Problem 2**:  What communication protocol to use, because my use-case needs "protocol y", my DSO needs "protocol z" and for car-charging I need another one. Please don't create or force me to use another communication protocol, do you?
 **Answer**: Although the standard for Scheduling is under the IEC 61850 standard, however the funcion scheduling itself isn't requiering the IEC 61850 communication protocol use.  It doesn't matter as long as you can manage a schedule to the scheduling logic, whatever protocol you use. This will enable you to choose your protocol which is needed for your use-case. And yes, other requirements to realize the right security level should be applied to all protocols.
 
-![Several actors with several IEC-schedules](../src/readme_infographic_embedding.png)
+![Infographic embedding IEC-scheduling into Fledge](./images/readme_infographic_embedding.png)
 
 ## Roadmap
 ### Scheduling as stand alone-service (realized!)
