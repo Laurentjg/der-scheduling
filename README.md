@@ -18,7 +18,7 @@ IEC scheduling solves two structural problems in controling complex energy syste
 ![Several actors with several capacity envelopes](./images/readme_totalenvelopes.png)
 
 
-**Answer**: IEC scheduling completely changes the concept of controlling, compared to what is known till sofar in the IEC landscape for energy automation. The main principle of it is to place ALL controls into parallell schedules and where a policy defines the priority of those schedules. There are NO direct controls. All controls, even locally generated are placed in (separate) schedules. Included in defining this policy is to give priority to schedules dependent on situational circumstances, such as:
+**Answer**: IEC scheduling completely changes the concept of controlling, compared to what is known till sofar in the IEC landscape for energy automation. The main principle of it is to place ALL controls into parallell schedules. The priority of those schedules is defined through policies. There are NO direct controls. All controls, even locally generated are placed in (separate) schedules. Included in defining this policy is to give priority to schedules dependent on situational circumstances, such as:
 1. Device just starting up, so soft-start may get priorities
 2. (Internet)communication is down, so slowly move towards pre-defined (safe) schedules.
 3. Voltage is too high, so curtailment of infeed get priority (and parallel simulate with HEMS to use more energy locally)
