@@ -26,7 +26,7 @@ IEC scheduling solves two structural problems in controling complex energy syste
 ![Several actors with several IEC-schedules](./images/readme_totalschedules.png)
 
 **Problem 2**:  What communication protocol to use, because my use-case needs "protocol y", my DSO needs "protocol z" and for car-charging I need another one. Please don't create or force me to use another communication protocol, do you?
-**Answer**: Although the standard for Scheduling is under the IEC 61850 standard, however the funcion scheduling itself isn't requiering the IEC 61850 communication protocol use.  It doesn't matter as long as you can manage a schedule to the scheduling logic, whatever protocol you use. This will enable you to choose your protocol which is needed for your use-case. And yes, other requirements to realize the right security level should be applied to all protocols.
+**Answer**: Although the standard for Scheduling is under the IEC 61850 standard, the funcion scheduling itself isn't requiering the IEC 61850 communication protocol use.  It doesn't matter as long as you can manage a schedule to the scheduling logic, whatever protocol you use. This will enable you to choose your protocol which is needed for your use-case. And yes, other requirements to realize the right security level should be applied to all protocols.
 
 ![Infographic embedding IEC-scheduling into Fledge](./images/readme_infographic_embedding.png)
 
