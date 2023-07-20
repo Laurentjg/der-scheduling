@@ -37,7 +37,7 @@ This has been realized till sofar. The main functionalities are to control a DER
 - maximal power output
 - turning them on or off
 
-The configuration of how the software is configured is realized with the [SCL file](https://github.com/alliander-opensource/der-scheduling/blob/main/models/der_scheduler.cid) which can be managed and adopted by our needs by [CoMPAS](https://github.com/com-pas). Schedules themselves are now fed into the software with an API from the CLI.
+The configuration of how the software is configured is realized with the [SCL file](https://github.com/alliander-opensource/der-scheduling/blob/main/models/der_scheduler.cid) which can be managed and adopted by any SCL compliant tool, e.g. [CoMPAS](https://github.com/com-pas). Schedules themselves are now fed into the software with an API from the CLI.
 With positive results, the solution is benchmarked against German commercial FNN-steuerboxes to have the same behaviour and to have at least the same performance.
 
 ### Scheduling integraded with official communication protol (active!)
