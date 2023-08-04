@@ -8,11 +8,11 @@ Basic schedule funtionality shall be supported, as depicted below:
 
 [C01]: Basic configuration of DER default shall be stored inside a SCL File
 
-[C01-a]: reserve schedules shall be stored inside a SCL File
+[C01-a]: Reserve Schedules shall be stored inside a SCL File
 
-[C01-b]: number of available schedules (maximum 10 schedules per logical Node, less can be configured) shall be stored inside a SCL File
+[C01-b]: Number of available schedules (maximum 10 schedules per logical Node, less can be configured) shall be stored inside a SCL File
 
-[C01-c]: number of devices to be controlled (limited to 1 for evaluation, extension shall be foreseen) shall be stored inside a SCL File
+[C01-c]: Number of devices to be controlled (limited to 1 for evaluation, extension shall be foreseen) shall be stored inside a SCL File
 
 [C02]: Parameters of schedules other than the reserve schedule are to be stored in a key-value manner
 
@@ -44,9 +44,11 @@ Basic schedule funtionality shall be supported, as depicted below:
 
 [S02]: Support time based schedules
 
+[S02-a]: All dates are in UTC
+
 [S03]: Triggers other than time based may be supported
 
-[S04]: Periodical schedules may be supported
+[S04]: Periodical schedules must be supported
 
 [S05a]: Support of absolute schedules of absolute power setpoints
 
@@ -60,7 +62,27 @@ Basic schedule funtionality shall be supported, as depicted below:
 
 [S10]: Each schedule must store a sequence of max. 100 values
 
+[S11]: There are three Reserve Schedules: Active Power Reserve Schedule, Maximum Power Reserve Schedule and On/Off Reserve Schedule
+
+[S12]: Each Reserve Schedule holds 100 values
+
+[S13]: Reserve Schedules are always active and cannot be deactivated
+
+[S14]: Reserve Schedules have the lowest priority (10). This cannot be changed.
+
+[S15]: Reserve Schedules have a fixed start date of 01.01.1970 00:00:01 (UTC). This cannot be changed.
+
+[S16]: Reserve Schedules are set to cyclic execution. This cannot be changed.
+
 # Schedule execution
 [E01]: Execution of schedules must regard schedule priority according to 61850-10
 
 [E02]: Resolution time base: >= 1 second
+
+# Interfaces
+
+[I01]: The Active power Actuator Interface contains the current value (a double) and the source schedule priority (an integer)
+
+[I02]: The Maximum Power Actuator Interface contains the current value (a double) and the source schedule priority (an integer)
+
+[I03]: The On/Off Actuator Interface contains the current value (a double) and the source schedule priority (an integer). The mapping is 0 - off / 1 - on.
