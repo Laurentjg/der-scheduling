@@ -524,7 +524,7 @@ strTm_writeAccessHandler(DataAttribute* dataAttribute, MmsValue* value, ClientCo
             return DATA_ACCESS_ERROR_SUCCESS_NO_UPDATE;
         }
         else {
-            printf("WARN: Write access to %s -> invalid value (is: %llu current: %llu\n", objRefBuf, newStrTm, Hal_getTimeInMs());
+            printf("WARN: Write access to %s -> invalid value (is: %lu current: %lu\n", objRefBuf, newStrTm, Hal_getTimeInMs());
 
             return DATA_ACCESS_ERROR_OBJECT_VALUE_INVALID;
         }
