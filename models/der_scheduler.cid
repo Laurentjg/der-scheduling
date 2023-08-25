@@ -131,6 +131,11 @@
                 <Val>@Control/ActPow_FSCH10</Val>
               </DAI>
             </DOI>
+            <DOI name="Schd11">
+              <DAI name="setSrcRef">
+                <Val>@Control/ActPow_Res_FSCH01</Val>
+              </DAI>
+            </DOI>
           </LN>
           <LN inst="1" lnClass="FSCC" lnType="DERScheduler_FSCC_APC" prefix="MaxPow_">
             <DOI desc="controlled entity" name="CtlEnt">
@@ -188,6 +193,11 @@
                 <Val>@Control/MaxPow_FSCH10</Val>
               </DAI>
             </DOI>
+            <DOI name="Schd11">
+              <DAI name="setSrcRef">
+                <Val>@Control/MaxPow_Res_FSCH01</Val>
+              </DAI>
+            </DOI>
           </LN>
           <LN inst="1" lnClass="FSCC" lnType="DERScheduler_FSCC_SPC" prefix="OnOff_">
             <DOI desc="controlled entity" name="CtlEnt">
@@ -243,6 +253,11 @@
             <DOI name="Schd10">
               <DAI name="setSrcRef">
                 <Val>@Control/OnOff_FSCH10</Val>
+              </DAI>
+            </DOI>
+            <DOI name="Schd11">
+              <DAI name="setSrcRef">
+                <Val>@Control/OnOff_Res_FSCH01</Val>
               </DAI>
             </DOI>
           </LN>
@@ -316,6 +331,53 @@
               </DAI>
             </DOI>
           </LN>
+          <LN lnClass="FSCH" prefix="ActPow_Res_" inst="01" lnType="DERScheduler_FSCH_ASG_100_periodic">
+            <DOI name="NumEntr">
+              <DAI name="setVal">
+                <Val>1</Val>
+              </DAI>
+            </DOI>
+            <DOI name="Beh" />
+            <DOI name="ValMV" />
+            <DOI name="SchdEnaErr" />
+            <DOI name="EnaReq" />
+            <DOI name="DsaReq" />
+            <DOI name="SchdIntv">
+              <DAI name="setVal">
+                <Val>3600</Val>
+              </DAI>
+            </DOI>
+            <DOI name="SchdPrio">
+              <DAI name="setVal">
+                <Val>0</Val>
+              </DAI>
+            </DOI>
+            <DOI name="ValASG001">
+              <SDI name="setMag">
+                <DAI name="f">
+                  <Val>0</Val>
+                </DAI>
+              </SDI>
+            </DOI>
+            <DOI name="SchdReuse">
+              <DAI name="setVal">
+                <Val>true</Val>
+              </DAI>
+            </DOI>
+            <DOI name="StrTm01">
+              <DAI name="setTm">
+                <Val>2020-01-01T00:00:00Z</Val>
+              </DAI>
+              <SDI name="setCal">
+                <DAI name="occType">
+                  <Val>Time</Val>
+                </DAI>
+                <DAI name="occPer">
+                  <Val>Hour</Val>
+                </DAI>
+              </SDI>
+            </DOI>
+          </LN>
           <LN lnClass="FSCH" prefix="MaxPow_" inst="01" lnType="DERScheduler_FSCH_ASG_100_nonperiodic">
             <DOI name="NumEntr">
               <DAI name="setVal">
@@ -386,6 +448,53 @@
               </DAI>
             </DOI>
           </LN>
+          <LN lnClass="FSCH" prefix="MaxPow_Res_" inst="01" lnType="DERScheduler_FSCH_ASG_100_periodic">
+            <DOI name="NumEntr">
+              <DAI name="setVal">
+                <Val>1</Val>
+              </DAI>
+            </DOI>
+            <DOI name="Beh" />
+            <DOI name="ValMV" />
+            <DOI name="SchdEnaErr" />
+            <DOI name="EnaReq" />
+            <DOI name="DsaReq" />
+            <DOI name="SchdIntv">
+              <DAI name="setVal">
+                <Val>3600</Val>
+              </DAI>
+            </DOI>
+            <DOI name="SchdPrio">
+              <DAI name="setVal">
+                <Val>0</Val>
+              </DAI>
+            </DOI>
+            <DOI name="ValASG001">
+              <SDI name="setMag">
+                <DAI name="f">
+                  <Val>0</Val>
+                </DAI>
+              </SDI>
+            </DOI>
+            <DOI name="SchdReuse">
+              <DAI name="setVal">
+                <Val>true</Val>
+              </DAI>
+            </DOI>
+            <DOI name="StrTm01">
+              <DAI name="setTm">
+                <Val>2020-01-01T00:00:00Z</Val>
+              </DAI>
+              <SDI name="setCal">
+                <DAI name="occType">
+                  <Val>Time</Val>
+                </DAI>
+                <DAI name="occPer">
+                  <Val>Hour</Val>
+                </DAI>
+              </SDI>
+            </DOI>
+          </LN>
           <LN lnClass="FSCH" prefix="OnOff_" inst="01" lnType="DERScheduler_FSCH_SPG_100_nonperiodic">
             <DOI name="NumEntr">
               <DAI name="setVal">
@@ -454,6 +563,50 @@
               <DAI name="setVal">
                 <Val>100</Val>
               </DAI>
+            </DOI>
+          </LN>
+          <LN lnClass="FSCH" prefix="OnOff_Res_" inst="01" lnType="DERScheduler_FSCH_SPG_100_periodic">
+            <DOI name="NumEntr">
+              <DAI name="setVal">
+                <Val>1</Val>
+              </DAI>
+            </DOI>
+            <DOI name="Beh" />
+            <DOI name="SchdEnaErr" />
+            <DOI name="EnaReq" />
+            <DOI name="DsaReq" />
+            <DOI name="SchdIntv">
+              <DAI name="setVal">
+                <Val>3600</Val>
+              </DAI>
+            </DOI>
+            <DOI name="SchdPrio">
+              <DAI name="setVal">
+                <Val>0</Val>
+              </DAI>
+            </DOI>
+            <DOI name="ValSPG001">
+              <DAI name="setVal">
+                <Val>false</Val>
+              </DAI>
+            </DOI>
+            <DOI name="SchdReuse">
+              <DAI name="setVal">
+                <Val>true</Val>
+              </DAI>
+            </DOI>
+            <DOI name="StrTm01">
+              <DAI name="setTm">
+                <Val>2020-01-01T00:00:00Z</Val>
+              </DAI>
+              <SDI name="setCal">
+                <DAI name="occType">
+                  <Val>Time</Val>
+                </DAI>
+                <DAI name="occPer">
+                  <Val>Hour</Val>
+                </DAI>
+              </SDI>
             </DOI>
           </LN>
         </LDevice>
@@ -1234,6 +1387,7 @@
       <DO name="Schd08" type="DERScheduler_ORG" />
       <DO name="Schd09" type="DERScheduler_ORG" />
       <DO name="Schd10" type="DERScheduler_ORG" />
+      <DO name="Schd11" type="DERScheduler_ORG" />
     </LNodeType>
     <LNodeType id="DERScheduler_FSCC_SPC" lnClass="FSCC">
       <DO name="Beh" type="ENS_Beh_On" />
@@ -1250,6 +1404,7 @@
       <DO name="Schd08" type="DERScheduler_ORG" />
       <DO name="Schd09" type="DERScheduler_ORG" />
       <DO name="Schd10" type="DERScheduler_ORG" />
+      <DO name="Schd11" type="DERScheduler_ORG" />
     </LNodeType>
     <LNodeType id="DERScheduler_GGIO_ActPow" lnClass="GGIO">
       <DO name="Beh" type="ENS_Beh_On" />
@@ -1376,7 +1531,7 @@
       <DA bType="Struct" dchg="true" fc="CF" name="units" type="DERScheduler_Units_kW" />
       <DA bType="Struct" dchg="true" fc="CF" name="minVal" type="AnalogueValue" />
       <DA bType="Struct" dchg="true" fc="CF" name="maxVal" type="AnalogueValue" />
-      <DA bType="FLOAT32" dchg="true" fc="CF" name="dbRef"/>
+      <DA bType="FLOAT32" dchg="true" fc="CF" name="dbRef" />
     </DOType>
     <DOType id="DERScheduler_APC_MaxPow" cdc="APC" desc="Maximum Output Power Setpoint">
       <DA bType="Struct" dchg="true" fc="MX" name="mxVal" type="AnalogueValue" />
@@ -1386,7 +1541,7 @@
         <Val>status-only</Val>
       </DA>
       <DA bType="Struct" dchg="true" fc="CF" name="units" type="DERScheduler_Units_kW" />
-      <DA bType="FLOAT32" dchg="true" fc="CF" name="dbRef"/>
+      <DA bType="FLOAT32" dchg="true" fc="CF" name="dbRef" />
     </DOType>
     <DOType id="DERScheduler_LPL" cdc="LPL">
       <DA bType="VisString255" fc="DC" name="vendor" />
@@ -1429,7 +1584,7 @@
     </DAType>
     <DAType id="CalendarTime">
       <BDA name="occ" bType="INT16U" />
-      <BDA name="occType" bType="Enum" type="OccurrenceKind"/>
+      <BDA name="occType" bType="Enum" type="OccurrenceKind" />
       <BDA name="occPer" bType="Enum" type="PeriodKind" />
       <BDA name="weekDay" bType="Enum" type="WeekdayKind" />
       <BDA name="month" bType="Enum" type="MonthKind" />
