@@ -34,7 +34,10 @@ import static java.util.stream.Collectors.toList;
  */
 public class ScheduleWriterExample {
 
-    public static final String HOST_NAME = "192.168.17.200";
+    // (so far) hard coded parameters for control, as used during Demo in 2022
+    public static final String HOST_ADDRESS = "192.168.17.200";
+    public static final Duration INTERVAL = ofSeconds(5);
+    public static final int PORT = 102;
 
     private static Logger log = LoggerFactory.getLogger(ScheduleWriterExample.class);
 
@@ -42,7 +45,6 @@ public class ScheduleWriterExample {
         final Instant setupStart = now();
         final List<String> argList = Arrays.asList(args);
         try {
-            final Duration interval = ofSeconds(5);
             log.info("Got args {}", argList);
 
             if (argList.size() < 4) {
@@ -72,11 +74,21 @@ public class ScheduleWriterExample {
             }
 
             log.info("Setting up new schedule with prio {} starting at {} with interval {} and values {}", prio, start,
-                    interval, values);
+                    INTERVAL, values);
 
-            try (final AllianderDER allianderDER = new AllianderDER(HOST_NAME, 102)) {
+            /**
+             * Parameters to control a DER:
+             *  - host address (HOST_ADDRESS)
+             *  - host port (PORT)
+             *  - control values (values)
+             *  - time interval betwen control values (INTERVAL)
+             *  - start date and time of control (start)
+             *  - control priority (prio)
+             *  - schedule number to be used for control, can be overwritten or reused after it completed (schedule_number)
+             */
+            try (final AllianderDER allianderDER = new AllianderDER(HOST_ADDRESS, PORT)) {
                 PreparedSchedule preparedSchedule = allianderDER.maxPowerSchedules.prepareSchedule(values,
-                        schedule_number, interval, start, prio);
+                        schedule_number, INTERVAL, start, prio);
                 allianderDER.writeAndEnableSchedule(preparedSchedule);
 
             } catch (Exception e) {
